@@ -5,6 +5,8 @@
 #include "firmware_version.h"
 #include "tasks_init.h"
 #include "scale_task.h"
+#include "lock_task.h"
+#include "temperature_task.h"
 #include "communication_task.h"
 #include "log.h"
 
@@ -13,49 +15,72 @@ extern serial_hal_driver_t nxp_serial_uart_hal_driver;
 extern void nxp_serial_uart_hal_isr(int handle);
 osThreadId   communication_task_hdl;
 osMessageQId communication_task_msg_q_id;
-
-osMessageQId communication_task_cfg_msg_q_id;
-osMessageQId communication_task_net_weight_msg_q_id;
-osMessageQId communication_task_remove_tare_weight_msg_q_id;
-osMessageQId communication_task_calibration_zero_msg_q_id;
-osMessageQId communication_task_calibration_full_msg_q_id;
+static communication_task_contex_t communication_task_contex;
 
 
-typedef enum
-{
-    ADU_HEAD_STEP = 0,
-    ADU_PDU_STEP,
-    ADU_CRC_STEP
-}adu_step_t;
+/*协议定义*/
+#define  ADU_SIZE_MAX                               60
+/*地址域*/
+#define  ADU_ADDR_REGION_OFFSET                     0
+#define  ADU_ADDR_REGION_SIZE                       1
+#define  ADU_ADDR                                   0x01
+/*命令码域*/
+#define  ADU_CODE_REGION_OFFSET                     1
+#define  ADU_CODE_REGION_SIZE                       1
+#define  CODE_REMOVTE_TARE                          0x01     
+#define  CODE_CALIBRATION                           0x02  
+#define  CODE_QUERY_NET_WEIGHT                      0x03  
+#define  CODE_QUERY_SCALE_CNT                       0x04  
+#define  CODE_QUERY_DOOR_STATUS                     0x11  
+#define  CODE_LOCK_LOCK                             0x21   
+#define  CODE_UNLOCK_LOCK                           0x22  
+#define  CODE_QUERY_LOCK_STATUS                     0x23  
+#define  CODE_QUERY_TEMPERATURE                     0x41  
+#define  CODE_SET_TEMPERATURE                       0x0A 
+#define  CODE_QUERY_MANUFACTURER                    0x51 
+/*数据域*/
+#define  ADU_DATA_REGION_OFFSET                     2
+#define  ADU_DATA_REGION_REMOVE_TARE_SIZE           1 
+#define  ADU_DATA_REGION_CALIBRATION_SIZE           3 
+#define  ADU_DATA_REGION_QUERY_NET_WEIGHT_SIZE      1 
+#define  ADU_DATA_REGION_QUERY_SCALE_CNT_SIZE       0 
+#define  ADU_DATA_REGION_QUERY_DOOR_STATUS_SIZE     0
+#define  ADU_DATA_REGION_LOCK_LOCK_SIZE             0
+#define  ADU_DATA_REGION_UNLOCK_LOCK_SIZE           0
+#define  ADU_DATA_REGION_QUERY_LOCK_STATUS_SIZE     0
+#define  ADU_DATA_REGION_QUERY_TEMPERATURE_SIZE     0
+#define  ADU_DATA_REGION_SET_TEMPERATURE_SIZE       1
+#define  ADU_DATA_REGION_QUERY_MANUFACTURER_SIZE    0
 
 
+#define  DATA_REGION_SCALE_ADDR_OFFSET              0
+#define  DATA_REGION_CALIBRATION_WEIGHT_OFFSET      1
+#define  DATA_REGION_SCALE_CNT_OFFSET               0
+#define  DATA_REGION_TEMPERATURE_OFFSET             0
+#define  DATA_REGION_STATUS_OFFSET                  0
 
-/*通信协议部分*/
-/*ADU*/
-#define  ADU_SIZE_MAX                  20
-#define  ADU_HEAD_OFFSET               0
-#define  ADU_HEAD_SIZE                 2
-#define  ADU_HEAD0_VALUE               'M'
-#define  ADU_HEAD1_VALUE               'L'
-#define  ADU_PDU_SIZE_REGION_OFFSET    2
-#define  ADU_PDU_SIZE_REGION_SIZE      1
-#define  ADU_PDU_OFFSET                3
-#define  ADU_CRC_SIZE                  2
-/*PDU*/
-#define  PDU_SIZE_MIN                  2
-#define  PDU_CODE_CONFIGRATION         0
-#define  PDU_CODE_NET_WEIGHT           1
-#define  PDU_CODE_REMOVE_TARE_WEIGHT   2
-#define  PDU_CODE_CALIBRATION_ZERO     3
-#define  PDU_CODE_CALIBRATION_FULL     4
-#define  PDU_CODE_FIRMWARE_VERSION     5
-#define  PDU_CODE_MAX                  PDU_CODE_FIRMWARE_VERSION
+/*协议操作值定义*/
+#define  DATA_NET_WEIGHT_ERR_VALUE                  0x7FFF
+#define  DATA_TEMPERATURE_ERR_VALUE                 0x7F
+#define  DATA_STATUS_DOOR_OPEN                      0x01
+#define  DATA_STATUS_DOOR_CLOSE                     0x00
+#define  DATA_STATUS_DOOR_ERR                       0xFF
+#define  DATA_STATUS_LOCK_LOCKED                    0x01
+#define  DATA_STATUS_LOCK_UNLOCKED                  0x00
+#define  DATA_STATUS_LOCK_ERR                       0xFF
+#define  DATA_RESULT_LOCK_SUCCESS                   0x01
+#define  DATA_RESULT_LOCK_FAIL                      0x00
+#define  DATA_RESULT_UNLOCK_SUCCESS                 0x01
+#define  DATA_RESULT_UNLOCK_FAIL                    0x00
+#define  DATA_RESULT_REMOVE_TARE_SUCCESS            0x01
+#define  DATA_RESULT_REMOVE_TARE_FAIL               0x00
+#define  DATA_RESULT_CALIBRATION_SUCCESS            0x01
+#define  DATA_RESULT_CALIBRATION_FAIL               0x00
+#define  DATA_RESULT_SET_TEMPERATURE_SUCCESS        0x01
+#define  DATA_RESULT_SET_TEMPERATURE_FAIL           0x00
+/*CRC16域*/
+#define  ADU_CRC_SIZE                               2
 
-#define  PDU_COMMUNICATION_ADDR           1
-/*协议错误码*/
-#define  PDU_NET_WEIGHT_ERR_VALUE      0x7FFF
-#define  PDU_SUCCESS_VALUE             0x00
-#define  PDU_FAILURE_VALUE             0x01
 
 /*协议时间*/
 #define  ADU_WAIT_TIMEOUT              osWaitForever
@@ -165,8 +190,6 @@ static uint8_t adu_add_crc16(uint8_t *adu,uint8_t size)
     return size;
 }
 
-/*电子秤上下文*/
-static scale_contex_t scale_contex;
 
 /*
 * @brief 读取电子称地址配置
@@ -192,19 +215,12 @@ static int communication_read_scale_addr_configration(scale_addr_configration_t 
 * @return >=0 对应的标号
 * @note
 */
-static int find_scale_index(const scale_contex_t *contex,uint8_t addr,uint8_t *start,uint8_t *end)
+static int find_scale_task_contex_index(const communication_task_contex_t *contex,uint8_t addr)
 {   
-    if (addr == 0) {
-        *start = 0;
-        *end = contex->cnt;
-        return 0;
-    } else {
-        for (uint8_t i = 0;i < contex->cnt;i ++) {
-            if (addr == contex->task[i].addr) {
-                *start = i;
-                *end = i + 1;
-                return 0;
-            }
+    /*指定电子秤任务*/
+    for (uint8_t i = 0;i < contex->cnt;i ++) {
+        if (addr == contex->scale_task_contex[i].internal_addr) {
+            return i;
         }
     }
 
@@ -213,256 +229,572 @@ static int find_scale_index(const scale_contex_t *contex,uint8_t addr,uint8_t *s
 
 
 /*
-* @brief 请求配置
-* @param value 配置缓存指针
+* @brief 请求电子秤数量
+* @param contex 电子秤上下文
 * @return -1 失败
-* @return  > 0 配置数据大小
+* @return  > 0 配置电子秤数量
 * @note
 */
-static int request_configration(scale_contex_t *contex,uint8_t *value)
+static int query_scale_cnt(communication_task_contex_t *contex)
 {
-    for (uint8_t i = 0;i < contex->cnt;i ++) {
-        value[i] = contex->task[i].addr;
-    }
-
     return contex->cnt;
 }
 
 /*
 * @brief 请求净重值
+* @param contex 通信任务任务上下文
 * @param addr 电子秤地址
 * @param value 净重量值指针
 * @return -1 失败
-* @return  > 0 净重量的数据长度
-* @note
-*/
-static int request_net_weight(const scale_contex_t *contex,const uint8_t addr,uint8_t *value)
-{
-    int rc;
-    uint8_t start,end;
-    osStatus   status;
-    osEvent    os_event;
-    task_msg_t req_msg,rsp_msg;
-    utils_timer_t timer;
-    uint16_t weight;
-
-    req_msg.type = REQ_NET_WEIGHT;
-    utils_timer_init(&timer,ADU_RSP_TIMEOUT,false);
-
-    /*给对应的电子秤任务发送消息*/
-    rc = find_scale_index(contex,addr,&start,&end);
-    if (rc != 0) {
-        log_error("scale addr:%d is invlaid.\r\n",addr);
-        return -1;
-    }
-    /*发送消息*/
-    for (uint8_t i = start;i < end;i ++) {    
-        status = osMessagePut(contex->task[i].msg_q_id,*(uint32_t *)&req_msg,utils_timer_value(&timer));
-        log_assert(status == osOK);
-    }
-    /*等待消息*/
-    for (uint8_t i = start;i < end;i ++) { 
-        weight = PDU_NET_WEIGHT_ERR_VALUE;
-        os_event = osMessageGet(contex->task[i].net_weight_msg_q_id,utils_timer_value(&timer));
-        if (os_event.status == osEventMessage ){
-            rsp_msg = *(task_msg_t *)&os_event.value.v;
-            if (rsp_msg.type == RSP_NET_WEIGHT) {
-                weight = rsp_msg.value == SCALE_TASK_NET_WEIGHT_ERR_VALUE ? PDU_NET_WEIGHT_ERR_VALUE : rsp_msg.value;             
-            } 
-
-        } 
-        value[i * 2] = weight & 0xFF;
-        value[i * 2 + 1] = weight >> 8;    
-    }
-           
-    return (end - start) * 2;
-}
-
-
-/*
-* @brief 请求去除皮重
-* @param addr 电子秤地址
-* @return -1 失败
 * @return  0 成功
 * @note
 */
-
-static int request_remove_tare_weight(const scale_contex_t *contex,const uint8_t addr,uint8_t *value)
+static int query_net_weight(const communication_task_contex_t *contex,const uint8_t addr,int16_t *value)
 {
     int rc;
-    uint8_t start,end;
-    osStatus   status;
-    osEvent    os_event;
-    task_msg_t req_msg,rsp_msg;
+    uint32_t flags = 0;
+    uint8_t cnt;
+    osStatus status;
+    osEvent os_event;
+
+    scale_task_message_t req_msg,rsp_msg;
     utils_timer_t timer;
-    uint8_t result[SCALE_CNT_MAX];
 
-    req_msg.type = REQ_REMOVE_TARE_WEIGHT;
+    req_msg.request.type = SCALE_TASK_MSG_TYPE_QUERY_NET_WEIGHT;
+    req_msg.request.rsp_message_queue_id = contex->net_weight_rsp_msg_q_id;
+
     utils_timer_init(&timer,ADU_RSP_TIMEOUT,false);
-
-    /*给对应的电子秤任务发送消息*/
-    rc = find_scale_index(contex,addr,&start,&end);
-    if (rc != 0) {
-        log_error("scale addr:%d is invlaid.\r\n",addr);
-        return -1;
-    }
-    /*发送消息*/
-    for (uint8_t i = start;i < end;i ++) {    
-        status = osMessagePut(contex->task[i].msg_q_id,*(uint32_t *)&req_msg,utils_timer_value(&timer));
+    /*全部电子秤任务*/
+    if (addr == 0) {      
+        /*发送消息*/
+        for (uint8_t i = 0;i < contex->cnt;i ++) { 
+            req_msg.request.addr = contex->scale_task_contex[i].internal_addr;
+            req_msg.request.index = i;
+            flags |= contex->scale_task_contex[i].flag;
+            status = osMessagePut(contex->scale_task_contex[i].msg_q_id,(uint32_t)&req_msg,utils_timer_value(&timer));
+            log_assert(status == osOK);
+        }
+    cnt = contex->cnt;
+    } else {/*指定电子秤任务*/
+        rc = find_scale_task_contex_index(contex,addr);
+        if (rc < 0) {
+            log_error("scale addr:%d invlaid.\r\n",addr);
+            return -1;
+        }    
+        req_msg.request.addr = addr;
+        req_msg.request.index = 0;
+        flags |= contex->scale_task_contex[rc].flag;
+        status = osMessagePut(contex->scale_task_contex[rc].msg_q_id,(uint32_t)&req_msg,utils_timer_value(&timer));
         log_assert(status == osOK);
+        cnt = 1;
     }
     /*等待消息*/
-    for (uint8_t i = start;i < end;i ++) { 
-        result[i] = PDU_FAILURE_VALUE;
-        os_event = osMessageGet(contex->task[i].remove_tare_weight_msg_q_id,utils_timer_value(&timer));
+    while (flags != 0 && utils_timer_value(&timer) > 0) {
+        os_event = osMessageGet(contex->net_weight_rsp_msg_q_id,utils_timer_value(&timer));
         if (os_event.status == osEventMessage ){
-            rsp_msg = *(task_msg_t *)&os_event.value.v;
-            if (rsp_msg.type == RSP_REMOVE_TARE_WEIGHT) {
-                result[i] = (rsp_msg.value & 0xFF ) == SCALE_TASK_SUCCESS ? PDU_SUCCESS_VALUE : PDU_FAILURE_VALUE;
+            rsp_msg = *(scale_task_message_t *)os_event.value.v;
+            if (rsp_msg.response.type != SCALE_TASK_MSG_TYPE_RSP_QUERY_NET_WEIGHT) {     
+                log_error("comm net weight rsp type:%d err.\r\n",rsp_msg.response.type);
+                return -1;
             }
-        } 
+            value[rsp_msg.response.index] = rsp_msg.response.weight;
+            flags ^= rsp_msg.response.flag;
+        }
+    }
         
+    if (flags != 0) {
+        log_error("net weight query err.fags:%d.\r\n",flags);
+        return -1;
     }
-    /*只要有一个错误就是失败*/
-    value[0] = PDU_SUCCESS_VALUE;
-    for (uint8_t i = start;i < end;i ++) {
-       if ( result[i] == PDU_FAILURE_VALUE) {
-            value[0] = PDU_FAILURE_VALUE;
-           break;
+
+    return cnt;
+}
+
+
+/*
+* @brief 去除皮重
+* @param contex 电子秤任务上下文
+* @param addr 电子秤地址
+* @return -1 失败
+* @return  0 成功
+* @note
+*/
+static int remove_tare_weight(const communication_task_contex_t *contex,const uint8_t addr)
+{
+    int rc;
+    uint32_t flags = 0;
+    osStatus status;
+    osEvent os_event;
+
+    scale_task_message_t req_msg,rsp_msg;
+    utils_timer_t timer;
+    bool success = true;
+
+    req_msg.request.type = SCALE_TASK_MSG_TYPE_REMOVE_TARE_WEIGHT;
+    req_msg.request.rsp_message_queue_id = contex->remove_tare_rsp_msg_q_id;
+
+    utils_timer_init(&timer,ADU_RSP_TIMEOUT,false);
+    /*全部电子秤任务*/
+    if (addr == 0) {      
+        /*发送消息*/
+        for (uint8_t i = 0;i < contex->cnt;i ++) { 
+            req_msg.request.addr = contex->scale_task_contex[i].internal_addr;
+            req_msg.request.index = i;
+            flags |= contex->scale_task_contex[i].flag;
+            status = osMessagePut(contex->scale_task_contex[i].msg_q_id,(uint32_t)&req_msg,utils_timer_value(&timer));
+            log_assert(status == osOK);
         }
-     }
-    return 1;
+    } else {/*指定电子秤任务*/
+        rc = find_scale_task_contex_index(contex,addr);
+        if (rc < 0) {
+            log_error("scale addr:%d invlaid.\r\n",addr);
+            return -1;
+        }    
+        req_msg.request.addr = addr;
+        req_msg.request.index = 0;
+        flags |= contex->scale_task_contex[rc].flag;
+        status = osMessagePut(contex->scale_task_contex[rc].msg_q_id,(uint32_t)&req_msg,utils_timer_value(&timer));
+        log_assert(status == osOK);
+    }
+    /*等待消息*/
+    while (flags != 0 && utils_timer_value(&timer) > 0) {
+        os_event = osMessageGet(contex->remove_tare_rsp_msg_q_id,utils_timer_value(&timer));
+        if (os_event.status == osEventMessage ){
+            rsp_msg = *(scale_task_message_t *)os_event.value.v;
+            if (rsp_msg.response.type != SCALE_TASK_MSG_TYPE_RSP_REMOVE_TARE_WEIGHT) {     
+                log_error("comm remove tare weight rsp type:%d err.\r\n",rsp_msg.response.type);
+            }
+            if (rsp_msg.response.result == SCALE_TASK_RESULT_FAIL) {
+                success = false;
+            }
+            flags ^= rsp_msg.response.flag;
+        }
+    }
+        
+    if (flags != 0) {
+        log_error("comm remove tare weight err.fags:%d.\r\n",flags);
+        return -1;
+    }
+
+    return success == true ? 0 : -1;
 }
 
 /*
-* @brief 请求0点校准
+* @brief 0点校准
+* @param contex 通信任务上下文
 * @param addr 电子秤地址
 * @param weight 校准重力值
 * @return -1 失败
 * @return  0 成功
 * @note
 */
-static int request_calibration_zero(const scale_contex_t *contex,const uint8_t addr,const int16_t weight,uint8_t *value)
+static int calibration_zero(const communication_task_contex_t *contex,const uint8_t addr,const int16_t weight)
 {
     int rc;
-    uint8_t start,end;
-    osStatus   status;
-    osEvent    os_event;
-    task_msg_t req_msg,rsp_msg;
+    uint32_t flags = 0;
+    osStatus status;
+    osEvent os_event;
+
+    scale_task_message_t req_msg,rsp_msg;
     utils_timer_t timer;
-    uint8_t result[SCALE_CNT_MAX];
+    bool success = true;
 
-    req_msg.type = REQ_CALIBRATION_ZERO;
-    req_msg.value = weight;
-    utils_timer_init(&timer,ADU_RSP_TIMEOUT,false);
-
-    /*给对应的电子秤任务发送消息*/
-    rc = find_scale_index(contex,addr,&start,&end);
-    if (rc != 0) {
-        log_error("scale addr:%d is invlaid.\r\n",addr);
+    if (weight != 0) {
+        log_error("calibration zero weight:%d != 0 err.\r\n",weight);
         return -1;
     }
-    /*发送消息*/
-    for (uint8_t i = start;i < end;i ++) {    
-        status = osMessagePut(contex->task[i].msg_q_id,*(uint32_t *)&req_msg,utils_timer_value(&timer));
+    req_msg.request.type = SCALE_TASK_MSG_TYPE_CALIBRATION_ZERO_WEIGHT;    
+    req_msg.request.rsp_message_queue_id = contex->calibration_zero_rsp_msg_q_id;
+    req_msg.request.weight = weight;
+    utils_timer_init(&timer,ADU_RSP_TIMEOUT,false);
+    /*全部电子秤任务*/
+    if (addr == 0) {      
+        /*发送消息*/
+        for (uint8_t i = 0;i < contex->cnt;i ++) { 
+            req_msg.request.addr = contex->scale_task_contex[i].internal_addr;
+            req_msg.request.index = i;
+            flags |= contex->scale_task_contex[i].flag;
+            status = osMessagePut(contex->scale_task_contex[i].msg_q_id,(uint32_t)&req_msg,utils_timer_value(&timer));
+            log_assert(status == osOK);
+        }
+    } else {/*指定电子秤任务*/
+        rc = find_scale_task_contex_index(contex,addr);
+        if (rc < 0) {
+            log_error("scale addr:%d invlaid.\r\n",addr);
+            return -1;
+        }    
+        req_msg.request.addr = addr;
+        req_msg.request.index = 0;
+        flags |= contex->scale_task_contex[rc].flag;
+        status = osMessagePut(contex->scale_task_contex[rc].msg_q_id,(uint32_t)&req_msg,utils_timer_value(&timer));
         log_assert(status == osOK);
     }
     /*等待消息*/
-    for (uint8_t i = start;i < end;i ++) { 
-        result[i] = PDU_FAILURE_VALUE;
-        os_event = osMessageGet(contex->task[i].calibration_zero_msg_q_id,utils_timer_value(&timer));
+    while (flags != 0 && utils_timer_value(&timer) > 0) {
+        os_event = osMessageGet(contex->calibration_zero_rsp_msg_q_id,utils_timer_value(&timer));
         if (os_event.status == osEventMessage ){
-            rsp_msg = *(task_msg_t *)&os_event.value.v;
-            if (rsp_msg.type == RSP_CALIBRATION_ZERO) {
-                result[i] = (rsp_msg.value & 0xFF ) == SCALE_TASK_SUCCESS ? PDU_SUCCESS_VALUE : PDU_FAILURE_VALUE;
-            } 
-        } 
-    }
-    /*只要有一个错误就是失败*/
-    value[0] = PDU_SUCCESS_VALUE;
-    for (uint8_t i = start;i < end;i ++) {
-       if ( result[i] == PDU_FAILURE_VALUE) {
-            value[0] = PDU_FAILURE_VALUE;
-           break;
+            rsp_msg = *(scale_task_message_t *)os_event.value.v;
+            if (rsp_msg.response.type != SCALE_TASK_MSG_TYPE_RSP_CALIBRATION_ZERO_WEIGHT) {     
+                log_error("comm calibration zero weight rsp type:%d err.\r\n",rsp_msg.response.type);
+            }
+            if (rsp_msg.response.result == SCALE_TASK_RESULT_FAIL) {
+                success = false;
+            }
+            flags ^= rsp_msg.response.flag;
         }
-     }
+    }
+        
+    if (flags != 0) {
+        log_error("comm calibration zero internal timeout err.fags:%d.\r\n",flags);
+        return -1;
+    }
 
-    return 1;         
+    return success == true ? 0 : -1;
 }
 
 /*
-* @brief 请求增益校准
+* @brief 增益校准
+* @param contex 通信任务上下文
 * @param addr 电子秤地址
 * @param weight 校准重力值
 * @return -1 失败
 * @return  0 成功
 * @note
 */
-static int request_calibration_full(const scale_contex_t *contex,const uint8_t addr,const int16_t weight,uint8_t *value)
+static int calibration_full(const communication_task_contex_t *contex,const uint8_t addr,const int16_t weight)
 {
     int rc;
-    uint8_t start,end;
-    osStatus   status;
-    osEvent    os_event;
-    task_msg_t req_msg,rsp_msg;
+    uint32_t flags = 0;
+    osStatus status;
+    osEvent os_event;
+
+    scale_task_message_t req_msg,rsp_msg;
     utils_timer_t timer;
-    uint8_t result[SCALE_CNT_MAX];
+    bool success = true;
 
-    req_msg.type = REQ_CALIBRATION_FULL;
-    req_msg.value = weight;
-    utils_timer_init(&timer,ADU_RSP_TIMEOUT,false);
-
-    /*给对应的电子秤任务发送消息*/
-    rc = find_scale_index(contex,addr,&start,&end);
-    if (rc != 0) {
-        log_error("scale addr:%d is invlaid.\r\n",addr);
+    if (weight <= 0) {
+        log_error("calibration full weight:%d <= 0 err.\r\n",weight);
         return -1;
     }
-    /*发送消息*/
-    for (uint8_t i = start;i < end;i ++) {    
-        status = osMessagePut(contex->task[i].msg_q_id,*(uint32_t *)&req_msg,utils_timer_value(&timer));
+    req_msg.request.type = SCALE_TASK_MSG_TYPE_CALIBRATION_FULL_WEIGHT;    
+    req_msg.request.rsp_message_queue_id = contex->calibration_full_rsp_msg_q_id;
+    req_msg.request.weight = weight;
+    utils_timer_init(&timer,ADU_RSP_TIMEOUT,false);
+    /*全部电子秤任务*/
+    if (addr == 0) {      
+        /*发送消息*/
+        for (uint8_t i = 0;i < contex->cnt;i ++) { 
+            req_msg.request.addr = contex->scale_task_contex[i].internal_addr;
+            req_msg.request.index = i;
+            flags |= contex->scale_task_contex[i].flag;
+            status = osMessagePut(contex->scale_task_contex[i].msg_q_id,(uint32_t)&req_msg,utils_timer_value(&timer));
+            log_assert(status == osOK);
+        }
+    } else {/*指定电子秤任务*/
+        rc = find_scale_task_contex_index(contex,addr);
+        if (rc < 0) {
+            log_error("scale addr:%d invlaid.\r\n",addr);
+            return -1;
+        }    
+        req_msg.request.addr = addr;
+        req_msg.request.index = 0;
+        flags |= contex->scale_task_contex[rc].flag;
+        status = osMessagePut(contex->scale_task_contex[rc].msg_q_id,(uint32_t)&req_msg,utils_timer_value(&timer));
         log_assert(status == osOK);
     }
     /*等待消息*/
-    for (uint8_t i = start;i < end;i ++) { 
-        result[i] = PDU_FAILURE_VALUE;
-        os_event = osMessageGet(contex->task[i].calibration_full_msg_q_id,utils_timer_value(&timer));
+    while (flags != 0 && utils_timer_value(&timer) > 0) {
+        os_event = osMessageGet(contex->calibration_full_rsp_msg_q_id,utils_timer_value(&timer));
         if (os_event.status == osEventMessage ){
-            rsp_msg = *(task_msg_t *)&os_event.value.v;
-            if (rsp_msg.type == RSP_CALIBRATION_FULL) {
-                result[i] = (rsp_msg.value & 0xFF ) == SCALE_TASK_SUCCESS ? PDU_SUCCESS_VALUE : PDU_FAILURE_VALUE;
-            } 
-        } 
-    }
-    /*只要有一个错误就是失败*/
-    value[0] = PDU_SUCCESS_VALUE;
-    for (uint8_t i = start;i < end;i ++) {
-       if ( result[i] == PDU_FAILURE_VALUE) {
-            value[0] = PDU_FAILURE_VALUE;
-           break;
+            rsp_msg = *(scale_task_message_t *)os_event.value.v;
+            if (rsp_msg.response.type != SCALE_TASK_MSG_TYPE_RSP_CALIBRATION_FULL_WEIGHT) {     
+                log_error("comm calibration full weight rsp type:%d err.\r\n",rsp_msg.response.type);
+                return -1;
+            }
+            if (rsp_msg.response.result == SCALE_TASK_RESULT_FAIL) {
+                success = false;
+            }
+            flags ^= rsp_msg.response.flag;
         }
-     }
+    }
+        
+    if (flags != 0) {
+        log_error("comm calibration full internal timeout err.fags:%d.\r\n",flags);
+        return -1;
+    }
 
-    return 1;         
+    return success == true ? 0 : -1;       
 }
 
 /*
-* @brief 请求固件版本
-* @param fw_version 固件版本指针
+* @brief 查询门状态
+* @param contex 通信任务上下文
+* @param door_status 门状态指针
 * @return -1 失败
 * @return  0 成功
 * @note
 */
 
-static int request_firmware_version(uint8_t *fw_version)
+static int query_door_status(communication_task_contex_t *contex,uint8_t *door_status)
 {
-    fw_version[0] = FIRMWARE_VERSION_HEX & 0xFF;
-    fw_version[1] = (FIRMWARE_VERSION_HEX >> 8) & 0xFF;
-    fw_version[2] = (FIRMWARE_VERSION_HEX >> 16) & 0xFF;
+    osStatus status;
+    osEvent os_event;
 
-    return 3;
+    lock_task_message_t req_msg,rsp_msg;
+    utils_timer_t timer;
+
+    req_msg.request.type = LOCK_TASK_MSG_TYPE_QUERY_DOOR_STATUS;    
+    req_msg.request.rsp_message_queue_id = contex->query_door_status_rsp_msg_q_id;
+    utils_timer_init(&timer,ADU_RSP_TIMEOUT,false);
+    
+    /*发送消息*/
+    status = osMessagePut(lock_task_msg_q_id,(uint32_t)&req_msg,utils_timer_value(&timer));
+    log_assert(status == osOK);
+
+    /*等待消息*/
+    while (utils_timer_value(&timer) > 0) {
+        os_event = osMessageGet(contex->query_door_status_rsp_msg_q_id,utils_timer_value(&timer));
+        if (os_event.status == osEventMessage ){
+            rsp_msg = *(lock_task_message_t *)os_event.value.v;
+            if (rsp_msg.response.type != LOCK_TASK_MSG_TYPE_RSP_QUERY_DOOR_STATUS) {     
+                log_error("comm query door status rsp type:%d err.\r\n",rsp_msg.response.type);
+                return -1;
+            }
+            *door_status = rsp_msg.response.status;
+            return 0;
+        }
+    }
+        
+    log_error("comm query door status timeout err.\r\n");
+    return -1;
 }
 
+/*
+* @brief 查询锁状态
+* @param contex 通信任务上下文
+* @param lock_status 锁状态指针
+* @return -1 失败
+* @return  0 成功
+* @note
+*/
+static int query_lock_status(communication_task_contex_t *contex,uint8_t *lock_status)
+{
+    osStatus status;
+    osEvent os_event;
+
+    lock_task_message_t req_msg,rsp_msg;
+    utils_timer_t timer;
+
+    req_msg.request.type = LOCK_TASK_MSG_TYPE_QUERY_LOCK_STATUS;    
+    req_msg.request.rsp_message_queue_id = contex->query_lock_status_rsp_msg_q_id;
+    utils_timer_init(&timer,ADU_RSP_TIMEOUT,false);
+    
+    /*发送消息*/
+    status = osMessagePut(lock_task_msg_q_id,(uint32_t)&req_msg,utils_timer_value(&timer));
+    log_assert(status == osOK);
+
+    /*等待消息*/
+    while (utils_timer_value(&timer) > 0) {
+        os_event = osMessageGet(contex->query_lock_status_rsp_msg_q_id,utils_timer_value(&timer));
+        if (os_event.status == osEventMessage ){
+            rsp_msg = *(lock_task_message_t *)os_event.value.v;
+            if (rsp_msg.response.type != LOCK_TASK_MSG_TYPE_RSP_QUERY_LOCK_STATUS) {     
+                log_error("comm query lock status rsp type:%d err.\r\n",rsp_msg.response.type);
+                return -1;
+            }
+            *lock_status = rsp_msg.response.status;
+            return 0;
+        }
+    }
+        
+    log_error("comm query door status timeout err.\r\n");
+    return -1;
+}
+
+/*
+* @brief 开锁
+* @param contex 通信任务上下文
+* @param result 结果指针
+* @return -1 失败
+* @return  0 成功
+* @note
+*/
+
+static int unlock_lock(communication_task_contex_t *contex)
+{
+    osStatus status;
+    osEvent os_event;
+
+    lock_task_message_t req_msg,rsp_msg;
+    utils_timer_t timer;
+
+    req_msg.request.type = LOCK_TASK_MSG_TYPE_REQ_UNLOCK_LOCK;    
+    req_msg.request.rsp_message_queue_id = contex->unlock_lock_rsp_msg_q_id;
+    utils_timer_init(&timer,ADU_RSP_TIMEOUT,false);
+    
+    /*发送消息*/
+    status = osMessagePut(lock_task_msg_q_id,(uint32_t)&req_msg,utils_timer_value(&timer));
+    log_assert(status == osOK);
+
+    /*等待消息*/
+    while (utils_timer_value(&timer) > 0) {
+        os_event = osMessageGet(contex->unlock_lock_rsp_msg_q_id,utils_timer_value(&timer));
+        if (os_event.status == osEventMessage ){
+            rsp_msg = *(lock_task_message_t *)os_event.value.v;
+            if (rsp_msg.response.type != LOCK_TASK_MSG_TYPE_RSP_UNLOCK_LOCK_RESULT) {     
+                log_error("comm unlock lock rsp type:%d err.\r\n",rsp_msg.response.type);
+                return -1;
+            }
+            return rsp_msg.response.result == LOCK_TASK_RESULT_SUCCESS ? 0 : -1;
+            
+        }
+    }
+        
+    log_error("comm unlock lock timeout err.\r\n");
+    return -1;
+}
+
+/*
+* @brief 关锁
+* @param contex 通信任务上下文
+* @return -1 失败
+* @return  0 成功
+* @note
+*/
+static int lock_lock(communication_task_contex_t *contex)
+{
+    osStatus status;
+    osEvent os_event;
+
+    lock_task_message_t req_msg,rsp_msg;
+    utils_timer_t timer;
+
+    req_msg.request.type = LOCK_TASK_MSG_TYPE_REQ_LOCK_LOCK;    
+    req_msg.request.rsp_message_queue_id = contex->lock_lock_rsp_msg_q_id;
+    utils_timer_init(&timer,ADU_RSP_TIMEOUT,false);
+    
+    /*发送消息*/
+
+    status = osMessagePut(lock_task_msg_q_id,(uint32_t)&req_msg,utils_timer_value(&timer));
+    log_assert(status == osOK);
+
+    /*等待消息*/
+    while (utils_timer_value(&timer) > 0) {
+        os_event = osMessageGet(contex->lock_lock_rsp_msg_q_id,utils_timer_value(&timer));
+        if (os_event.status == osEventMessage ){
+            rsp_msg = *(lock_task_message_t *)os_event.value.v;
+            if (rsp_msg.response.type != LOCK_TASK_MSG_TYPE_RSP_LOCK_LOCK_RESULT) {     
+                log_error("comm lock lock rsp type:%d err.\r\n",rsp_msg.response.type);
+                return -1;
+            }
+            return rsp_msg.response.result == LOCK_TASK_RESULT_SUCCESS ? 0 : -1;
+        }
+    }
+        
+    log_error("comm lock lock timeout err.\r\n");
+    return -1;
+}
+
+/*
+* @brief 查询温度值
+* @param contex 通信任务上下文
+* @param temperature 温度指针
+* @return -1 失败
+* @return  0 成功
+* @note
+*/
+
+static int query_temperature(communication_task_contex_t *contex,int8_t *temperature)
+{
+    osStatus status;
+    osEvent os_event;
+
+    temperature_task_message_t req_msg,rsp_msg;
+    utils_timer_t timer;
+
+    req_msg.request.type = TEMPERATURE_TASK_MSG_TYPE_QUERY_TEMPERATURE;    
+    req_msg.request.rsp_message_queue_id = contex->query_temperature_rsp_msg_q_id;
+    utils_timer_init(&timer,ADU_RSP_TIMEOUT,false);
+    
+    /*发送消息*/
+
+    status = osMessagePut(temperature_task_msg_q_id,(uint32_t)&req_msg,utils_timer_value(&timer));
+    log_assert(status == osOK);
+
+    /*等待消息*/
+    while (utils_timer_value(&timer) > 0) {
+        os_event = osMessageGet(contex->query_temperature_rsp_msg_q_id,utils_timer_value(&timer));
+        if (os_event.status == osEventMessage ){
+            rsp_msg = *(lock_task_message_t *)os_event.value.v;
+            if (rsp_msg.response.type != LOCK_TASK_MSG_TYPE_RSP_QUERY_TEMPERATURE) {     
+                log_error("comm query temperature rsp type:%d err.\r\n",rsp_msg.response.type);
+                return -1;
+            }
+            *temperature = rsp_msg.response.temperature_int;
+            return 0;
+        }
+    }
+        
+    log_error("comm query temperature timeout err.\r\n");
+    return -1;
+}
+
+
+/*
+* @brief 设置压缩机温度控制区间
+* @param contex 通信任务上下文
+* @param level 温度区间等级
+* @return -1 失败
+* @return  0 成功
+* @note
+*/
+static int set_temperature_level(communication_task_contex_t *contex,uint8_t level)
+{
+    osStatus status;
+    osEvent os_event;
+
+    compressor_task_message_t req_msg,rsp_msg;
+    utils_timer_t timer;
+
+    req_msg.request.type = COMPRESSOR_TASK_MSG_TYPE_SET_TEMPERATURE_LEVEL;    
+    req_msg.request.rsp_message_queue_id = contex->set_temperature_level_rsp_msg_q_id;
+    utils_timer_init(&timer,ADU_RSP_TIMEOUT,false);
+    
+    /*发送消息*/
+    status = osMessagePut(compressor_task_msg_q_id,(uint32_t)&req_msg,utils_timer_value(&timer));
+    log_assert(status == osOK);
+
+    /*等待消息*/
+    while (utils_timer_value(&timer) > 0) {
+        os_event = osMessageGet(contex->set_temperature_level_rsp_msg_q_id,utils_timer_value(&timer));
+        if (os_event.status == osEventMessage ){
+            rsp_msg = *(lock_task_message_t *)os_event.value.v;
+            if (rsp_msg.response.type != LOCK_TASK_MSG_TYPE_RSP_SET_TEMPERATURE_LEVEL) {     
+                log_error("comm set temperature level rsp type:%d err.\r\n",rsp_msg.response.type);
+                return -1;
+            }
+            return rsp_msg.response.result == COMPRESSOR_TASK_RESULT_SUCCESS ? 0 : -1;
+        }
+    }
+        
+    log_error("comm set temperature level timeout err.\r\n");
+    return -1;
+}
+
+/*
+* @brief 查询厂家ID
+* @param contex 通信任务上下文
+* @param manufacturer 厂家id指针
+* @return -1 失败
+* @return  0 成功
+* @note
+*/
+
+static int query_manufacturer(communication_task_contex_t *contex,uint8_t *manufacturer)
+{
+    *manufacturer = contex->manufacturer_id;
+    return 0;
+}
 
 /*
 * @brief 串口接收主机ADU
@@ -514,47 +846,8 @@ static int receive_adu(int handle,uint8_t *adu,uint8_t size,uint32_t timeout)
     log_error("adu recv unknow err.\r\n");
     return -1;
 }
-/*协议定义*/
-/*地址域*/
-#define  ADU_ADDR_REGION_OFFSET                     0
-#define  ADU_ADDR_REGION_SIZE                       1
-#define  ADU_ADDR                                   0x01
-/*命令码域*/
-#define  ADU_CODE_REGION_OFFSET                     1
-#define  ADU_CODE_REGION_SIZE                       1
-#define  CODE_REMOVTE_TARE                          0x01     
-#define  CODE_CALIBRATION                           0x02  
-#define  CODE_QUERY_NET_WEIGHT                      0x03  
-#define  CODE_QUERY_SCALE_CNT                       0x04  
-#define  CODE_QUERY_DOOR_STATUS                     0x11  
-#define  CODE_LOCK_LOCK                             0x21   
-#define  CODE_UNLOCK_LOCK                           0x22  
-#define  CODE_QUERY_LOCK_STATUS                     0x23  
-#define  CODE_QUERY_TEMPERATURE                     0x41  
-#define  CODE_SET_TEMPERATURE                       0x0A 
-#define  CODE_QUERY_MANUFACTURER                    0x51 
-/*数据域*/
-#define  ADU_DATA_REGION_OFFSET                     2
-#define  ADU_DATA_REGION_REMOVE_TARE_SIZE           1 
-#define  ADU_DATA_REGION_CALIBRATION_SIZE           3 
-#define  ADU_DATA_REGION_QUERY_NET_WEIGHT_SIZE      1 
-#define  ADU_DATA_REGION_QUERY_SCALE_CNT_SIZE       0 
-#define  ADU_DATA_REGION_QUERY_DOOR_STATUS_SIZE     0
-#define  ADU_DATA_REGION_LOCK_LOCK_SIZE             0
-#define  ADU_DATA_REGION_UNLOCK_LOCK_SIZE           0
-#define  ADU_DATA_REGION_QUERY_LOCK_STATUS_SIZE     0
-#define  ADU_DATA_REGION_QUERY_TEMPERATURE_SIZE     0
-#define  ADU_DATA_REGION_SET_TEMPERATURE_SIZE       1
-#define  ADU_DATA_REGION_QUERY_MANUFACTURER_SIZE    0
 
 
-#define  DATA_REGION_SCALE_ADDR_OFFSET              0
-#define  DATA_REGION_CALIBRATION_WEIGHT_OFFSET      1
-#define  DATA_REGION_SCALE_CNT_OFFSET               0
-#define  DATA_REGION_TEMPERATURE_OFFSET             0
-#define  DATA_REGION_STATUS_OFFSET                  0
-/*CRC16域*/
-#define  ADU_CRC_SIZE                               2
 /*
 * @brief 解析adu
 * @param adu 数据缓存指针
@@ -615,11 +908,11 @@ static int parse_adu(uint8_t *adu,uint8_t size,uint8_t *rsp)
             }
             scale_addr = adu[ADU_DATA_REGION_OFFSET + DATA_REGION_SCALE_ADDR_OFFSET];
             log_debug("scale addr:%d remove tare weight...\r\n",scale_addr);
-            rc = remove_tare_weight(scale_addr);
-            if (rc == 0) {    
-                rsp[rsp_offset ++] = ADU_SUCCESS;
+            rc = remove_tare_weight(&communication_task_contex,scale_addr);
+            if (rc == 0) {
+                rsp[rsp_offset ++] = DATA_RESULT_REMOVE_TARE_SUCCESS;
             } else {
-                rsp[rsp_offset ++] = ADU_FAILURE;
+                rsp[rsp_offset ++] = DATA_RESULT_REMOVE_TARE_FAIL;
             }
             break;
         case CODE_CALIBRATION:/*校准*/
@@ -630,11 +923,15 @@ static int parse_adu(uint8_t *adu,uint8_t size,uint8_t *rsp)
             scale_addr = adu[ADU_DATA_REGION_OFFSET + DATA_REGION_SCALE_ADDR_OFFSET];
             calibration_weight = (uint16_t)adu[ADU_DATA_REGION_OFFSET + DATA_REGION_CALIBRATION_WEIGHT_OFFSET] << 8 | adu[ADU_DATA_REGION_OFFSET + DATA_REGION_CALIBRATION_WEIGHT_OFFSET + 1];
             log_debug("scale addr:%d calibration weight:%d...\r\n",scale_addr,calibration_weight);
-            rc = calibration_weight(scale_addr,calibration_weight);
-            if (rc == 0) {    
-                rsp[rsp_offset ++] = ADU_SUCCESS;
+            if (calibration_weight == 0) {
+                rc = calibration_zero(&communication_task_contex,scale_addr,calibration_weight);
+            } else {   
+                rc = calibration_full(&communication_task_contex,scale_addr,calibration_weight);
+            }
+            if (rc == 0) {
+                rsp[rsp_offset ++] = DATA_RESULT_CALIBRATION_SUCCESS;
             } else {
-                rsp[rsp_offset ++] = ADU_FAILURE;
+                rsp[rsp_offset ++] = DATA_RESULT_CALIBRATION_FAIL;
             }
             break;
         case CODE_QUERY_NET_WEIGHT:/*净重*/
@@ -645,16 +942,15 @@ static int parse_adu(uint8_t *adu,uint8_t size,uint8_t *rsp)
             scale_addr = adu[ADU_DATA_REGION_OFFSET + DATA_REGION_SCALE_ADDR_OFFSET];
             log_debug("scale addr:%d query net weight...\r\n",scale_addr);
             
-            rc = query_net_weight(scale_addr,net_weight);
+            rc = query_net_weight(&communication_task_contex,scale_addr,net_weight);
+            if (rc != 0) {
+                log_error("query net weight internal err.\r\n");
+                return -1;
+            } 
             for (uint8_t i = 0; i < SCALE_CNT_MAX; i++) {
                 if (i < rc) {
-                    if (net_weight[i] == NET_WEIGHT_ERR_VALUE) {
-                        rsp[rsp_offset ++] = (ADU_NET_WEIGHT_ERR_VALUE >> 8) & 0xFF;
-                        rsp[rsp_offset ++] =  ADU_NET_WEIGHT_ERR_VALUE  & 0xFF;
-                    } else {
-                        rsp[rsp_offset ++] = (net_weight[i] >> 8) & 0xFF;
-                        rsp[rsp_offset ++] =  net_weight[i]  & 0xFF;
-                    }
+                    rsp[rsp_offset ++] = (net_weight[i] >> 8) & 0xFF;
+                    rsp[rsp_offset ++] =  net_weight[i]  & 0xFF;
                 } else {
                     rsp[rsp_offset ++] = 0;
                     rsp[rsp_offset ++] =  0;
@@ -667,7 +963,7 @@ static int parse_adu(uint8_t *adu,uint8_t size,uint8_t *rsp)
                 return -1;
             }
             log_debug("query scale cnt...\r\n");
-            query_scale_cnt(&scale_cnt);
+            scale_cnt = query_scale_cnt(&communication_task_contex);
             rsp[rsp_offset ++] = scale_cnt;
             break;
         case CODE_QUERY_DOOR_STATUS:/*门状态*/
@@ -676,11 +972,15 @@ static int parse_adu(uint8_t *adu,uint8_t size,uint8_t *rsp)
                 return -1;
             }
             log_debug("query door status...\r\n");
-            query_door_status(&status);
-            if (status == DOOR_STATUS_OPEN) {
-                rsp[rsp_offset ++] = ADU_DOOR_STATUS_OPEN;
+            rc = query_door_status(&communication_task_contex,&status);
+            if (rc != 0) {
+                log_error("query door status internal err.\r\n");
+                return -1;
+            }
+            if (status == LOCK_TASK_STATUS_DOOR_OPEN) {
+                rsp[rsp_offset ++] = DATA_STATUS_DOOR_OPEN;
             } else {
-                rsp[rsp_offset ++] = ADU_DOOR_STATUS_CLOSE;
+                rsp[rsp_offset ++] = DATA_STATUS_DOOR_CLOSE; 
             }
             break;
         case CODE_LOCK_LOCK:/*关锁*/
@@ -689,11 +989,11 @@ static int parse_adu(uint8_t *adu,uint8_t size,uint8_t *rsp)
                 return -1;
             }
             log_debug("lock lock...\r\n");
-            rc = lock_lock();
+            rc = lock_lock(&communication_task_contex);
             if (rc == 0) {
-                rsp[rsp_offset ++] = ADU_SUCCESS;
+                rsp[rsp_offset ++] = DATA_RESULT_LOCK_SUCCESS;
             } else {
-                rsp[rsp_offset ++] = ADU_FAILURE;
+                rsp[rsp_offset ++] = DATA_RESULT_LOCK_FAIL;
             }
             break;
         case CODE_UNLOCK_LOCK:/*开锁*/
@@ -702,11 +1002,11 @@ static int parse_adu(uint8_t *adu,uint8_t size,uint8_t *rsp)
                 return -1;
             }
             log_debug("unlock lock...\r\n");
-            rc = unlock_lock();
+            rc = unlock_lock(&communication_task_contex);
             if (rc == 0) {
-                rsp[rsp_offset ++] = ADU_SUCCESS;
+                rsp[rsp_offset ++] = DATA_RESULT_UNLOCK_SUCCESS;
             } else {
-                rsp[rsp_offset ++] = ADU_FAILURE;
+                rsp[rsp_offset ++] = DATA_RESULT_UNLOCK_FAIL;
             }
             break;      
         case CODE_QUERY_LOCK_STATUS:/*锁状态*/
@@ -715,11 +1015,15 @@ static int parse_adu(uint8_t *adu,uint8_t size,uint8_t *rsp)
                 return -1;
             }
             log_debug("query lock status...\r\n");
-            query_lock_status(&status);
-            if (status == LOCK_STATUS_LOCK) {
-                rsp[rsp_offset ++] = ADU_LOCK_STATUS_LOCK;
+            rc = query_door_status(&communication_task_contex,&status);
+            if (rc != 0) {
+                log_error("query lock status internal err.\r\n");
+                return -1;
+            }
+            if (status == LOCK_TASK_STATUS_LOCK_LOCKED) {
+                rsp[rsp_offset ++] = DATA_STATUS_LOCK_LOCKED;
             } else {
-                rsp[rsp_offset ++] = ADU_LOCK_STATUS_UNLOCK;
+                rsp[rsp_offset ++] = DATA_STATUS_LOCK_UNLOCKED; 
             }
             break;
         case CODE_QUERY_TEMPERATURE:/*查询温度*/
@@ -728,13 +1032,13 @@ static int parse_adu(uint8_t *adu,uint8_t size,uint8_t *rsp)
                 return -1;
             }
             log_debug("query temperature...\r\n");
-            query_temperature(&temperature);
-            if (temperature == TEMPERATURE_ERR_VALUE) {
-                rsp[rsp_offset ++] = ADU_TEMPERATURE_ERR_VALUE;
-            } else {
-                rsp[rsp_offset ++] = temperature & 0xFF;
+            rc = query_temperature(&communication_task_contex,&temperature);
+            if (rc != 0) {
+                log_error("query door status internal err.\r\n");
+                return -1;
             }
-            break;  
+            rsp[rsp_offset ++] = temperature;
+            break; 
         case CODE_SET_TEMPERATURE:/*设置温度区间*/
             if (size != ADU_DATA_REGION_SET_TEMPERATURE_SIZE) {
                 log_error("set temperature data size:%d != %d err.\r\n",size,ADU_DATA_REGION_SET_TEMPERATURE_SIZE);
@@ -742,12 +1046,12 @@ static int parse_adu(uint8_t *adu,uint8_t size,uint8_t *rsp)
             }
             temperature_level = adu[ADU_DATA_REGION_OFFSET + DATA_REGION_TEMPERATURE_OFFSET];
             log_debug("set temperature level:%d...\r\n",temperature_level);
-            rc = set_temperature(temperature_level);
+            rc = set_temperature_level(&communication_task_contex,temperature_level);
             if (rc == 0) {
-                rsp[rsp_offset ++] = ADU_SUCCESS;
+                rsp[rsp_offset ++] = DATA_RESULT_SET_TEMPERATURE_SUCCESS;     
             } else {
-                rsp[rsp_offset ++] = ADU_FAILURE;
-            }          
+                rsp[rsp_offset ++] = DATA_RESULT_SET_TEMPERATURE_FAIL; 
+            }                
             break;
         case CODE_QUERY_MANUFACTURER:/*查询厂商ID*/
             if (size != ADU_DATA_REGION_QUERY_MANUFACTURER_SIZE) {
@@ -755,7 +1059,7 @@ static int parse_adu(uint8_t *adu,uint8_t size,uint8_t *rsp)
                 return -1;
             }
             log_debug("query manufacture...\r\n");
-            query_manufacture(&manufacturer_id);
+            query_manufacturer(&communication_task_contex,&manufacturer_id);
             rsp[rsp_offset ++] = manufacturer_id;           
             break;  
         default:
@@ -847,11 +1151,14 @@ static int get_serial_port_by_addr(uint8_t addr)
 * @note
 */
 
-static int get_serial_handle_by_port(scale_contex_t *contex,uint8_t port)
+static int get_serial_handle_by_port(communication_task_contex_t *contex,uint8_t port)
 {
+    if (!contex->initialized) {
+        return -1;
+    }
     for (uint8_t i = 0;i <contex->cnt;i ++) {
-        if (contex->task[i].port == port) {
-            return contex->task[i].handle;
+        if (contex->scale_task_contex[i].port == port) {
+            return contex->scale_task_contex[i].handle;
         }
     }
     return -1;
@@ -869,7 +1176,7 @@ void FLEXCOMM1_IRQHandler()
 {
     int handle;
 
-    handle = get_serial_handle_by_port(&scale_contex,1);
+    handle = get_serial_handle_by_port(&communication_task_contex,1);
     if (handle > 0) {
         nxp_serial_uart_hal_isr(handle);
     }
@@ -881,7 +1188,7 @@ void FLEXCOMM2_IRQHandler()
 {
     int handle;
 
-    handle = get_serial_handle_by_port(&scale_contex,2);
+    handle = get_serial_handle_by_port(&communication_task_contex,2);
     if (handle > 0) {
         nxp_serial_uart_hal_isr(handle);
     }
@@ -893,7 +1200,7 @@ void FLEXCOMM3_IRQHandler()
 {
     int handle;
 
-    handle = get_serial_handle_by_port(&scale_contex,3);
+    handle = get_serial_handle_by_port(&communication_task_contex,3);
     if (handle > 0) {
         nxp_serial_uart_hal_isr(handle);
     }
@@ -904,7 +1211,7 @@ void FLEXCOMM4_IRQHandler()
 {
     int handle;
 
-    handle = get_serial_handle_by_port(&scale_contex,4);
+    handle = get_serial_handle_by_port(&communication_task_contex,4);
     if (handle > 0) {
         nxp_serial_uart_hal_isr(handle);
     }
@@ -916,7 +1223,7 @@ void FLEXCOMM5_IRQHandler()
 {
     int handle;
 
-    handle = get_serial_handle_by_port(&scale_contex,5);
+    handle = get_serial_handle_by_port(&communication_task_contex,5);
     if (handle > 0) {
         nxp_serial_uart_hal_isr(handle);
     }
@@ -928,7 +1235,7 @@ void FLEXCOMM6_IRQHandler()
 {
     int handle;
 
-    handle = get_serial_handle_by_port(&scale_contex,6);
+    handle = get_serial_handle_by_port(&communication_task_contex,6);
     if (handle > 0) {
         nxp_serial_uart_hal_isr(handle);
     }
@@ -940,7 +1247,7 @@ void FLEXCOMM7_IRQHandler()
 {
     int handle;
 
-    handle = get_serial_handle_by_port(&scale_contex,7);
+    handle = get_serial_handle_by_port(&communication_task_contex,7);
     if (handle > 0) {
         nxp_serial_uart_hal_isr(handle);
     }
@@ -951,7 +1258,7 @@ void FLEXCOMM8_IRQHandler()
 {
     int handle;
 
-    handle = get_serial_handle_by_port(&scale_contex,8);
+    handle = get_serial_handle_by_port(&communication_task_contex,8);
     if (handle > 0) {
         nxp_serial_uart_hal_isr(handle);
     }
@@ -960,13 +1267,13 @@ void FLEXCOMM8_IRQHandler()
 
 
 /*
-* @brief 电子称子任务配置初始化
-* @param configration 任务参数指针
+* @brief 通信任务上下文配置初始化
+* @param contex 任务参数指针
 * @param host_msg_id 主任务消息队列句柄
 * @return 无
 * @note
 */
-static void communication_scale_contex_init(scale_contex_t *contex)
+static void communication_task_contex_init(communication_task_contex_t *contex)
 {
     int rc;
     /*电子秤地址配置信息*/
@@ -976,54 +1283,66 @@ static void communication_scale_contex_init(scale_contex_t *contex)
 
     contex->cnt = scale_addr.cnt;
     for (uint8_t i = 0;i < contex->cnt;i ++) {
-        contex->task[i].addr = scale_addr.value[i];
-        contex->task[i].default_addr = COMMUNICATION_TASK_SCALE_DEFAULT_ADDR;
-        contex->task[i].port = get_serial_port_by_addr(contex->task[i].addr);
-        contex->task[i].baud_rates = SCALE_TASK_SERIAL_BAUDRATES;
-        contex->task[i].data_bits = SCALE_TASK_SERIAL_DATABITS;
-        contex->task[i].stop_bits = SCALE_TASK_SERIAL_STOPBITS;
+        contex->scale_task_contex[i].internal_addr = scale_addr.value[i];
+        contex->scale_task_contex[i].phy_addr = COMMUNICATION_TASK_SCALE_DEFAULT_ADDR;
+        contex->scale_task_contex[i].port = get_serial_port_by_addr(contex->scale_task_contex[i].internal_addr);
+        contex->scale_task_contex[i].baud_rates = SCALE_TASK_SERIAL_BAUDRATES;
+        contex->scale_task_contex[i].data_bits = SCALE_TASK_SERIAL_DATABITS;
+        contex->scale_task_contex[i].stop_bits = SCALE_TASK_SERIAL_STOPBITS;
 
-        rc = serial_create(&contex->task[i].handle,SCALE_TASK_RX_BUFFER_SIZE,SCALE_TASK_RX_BUFFER_SIZE);
+        rc = serial_create(&contex->scale_task_contex[i].handle,SCALE_TASK_RX_BUFFER_SIZE,SCALE_TASK_RX_BUFFER_SIZE);
         log_assert(rc == 0);
-        rc = serial_register_hal_driver(contex->task[i].handle,&nxp_serial_uart_hal_driver);
+        rc = serial_register_hal_driver(contex->scale_task_contex[i].handle,&nxp_serial_uart_hal_driver);
         log_assert(rc == 0);
  
-        rc = serial_open(contex->task[i].handle,
-                         contex->task[i].port,
-                         contex->task[i].baud_rates,
-                         contex->task[i].data_bits,
-                         contex->task[i].stop_bits);
+        rc = serial_open(contex->scale_task_contex[i].handle,
+                         contex->scale_task_contex[i].port,
+                         contex->scale_task_contex[i].baud_rates,
+                         contex->scale_task_contex[i].data_bits,
+                         contex->scale_task_contex[i].stop_bits);
         log_assert(rc == 0);
         /*清空接收缓存*/
-        serial_flush(contex->task[i].handle);
-
-        /*主消息队列*/
-        osMessageQDef(msg_q,1,uint32_t);
-        contex->task[i].msg_q_id = osMessageCreate(osMessageQ(msg_q),0);
-        log_assert(contex->task[i].msg_q_id);
-
-        /*净重消息队列*/
-        osMessageQDef(net_weight_msg_q,1,uint32_t);
-        contex->task[i].net_weight_msg_q_id = osMessageCreate(osMessageQ(net_weight_msg_q),0);
-        log_assert(contex->task[i].net_weight_msg_q_id);
-        /*去皮消息队列*/
-        osMessageQDef(remove_tare_weight_msg_q,1,uint32_t);
-        contex->task[i].remove_tare_weight_msg_q_id = osMessageCreate(osMessageQ(remove_tare_weight_msg_q),0);
-        log_assert(contex->task[i].remove_tare_weight_msg_q_id);
-        /*0点校准消息队列*/
-        osMessageQDef(calibration_zero_msg_q,1,uint32_t);
-        contex->task[i].calibration_zero_msg_q_id = osMessageCreate(osMessageQ(calibration_zero_msg_q),0);
-        log_assert(contex->task[i].calibration_zero_msg_q_id);
-        /*增益校准消息队列*/
-        osMessageQDef(calibration_full_msg_q,1,uint32_t);
-        contex->task[i].calibration_full_msg_q_id = osMessageCreate(osMessageQ(calibration_full_msg_q),0);
-        log_assert(contex->task[i].calibration_full_msg_q_id);
+        serial_flush(contex->scale_task_contex[i].handle);
 
         /*创建电子秤任务*/
         osThreadDef(scale_task, scale_task, osPriorityNormal, 0, 256);
-        contex->task[i].task_hdl = osThreadCreate(osThread(scale_task),&contex->task[i]);
-        log_assert(contex->task[i].task_hdl);
-        }  
+        contex->scale_task_contex[i].task_hdl = osThreadCreate(osThread(scale_task),&contex->scale_task_contex[i]);
+        log_assert(contex->scale_task_contex[i].task_hdl);
+    }  
+    /*开锁回应消息队列*/
+    osMessageQDef(unlock_lock_rsp_msg_q,1,uint32_t);
+    contex->unlock_lock_rsp_msg_q_id = osMessageCreate(osMessageQ(unlock_lock_rsp_msg_q),0);
+    log_assert(contex->unlock_lock_rsp_msg_q_id);
+    /*关锁回应消息队列*/
+    osMessageQDef(lock_lock_rsp_msg_q,1,uint32_t);
+    contex->lock_lock_rsp_msg_q_id = osMessageCreate(osMessageQ(lock_lock_rsp_msg_q),0);
+    log_assert(contex->lock_lock_rsp_msg_q_id);
+    /*锁状态回应消息队列*/
+    osMessageQDef(query_lock_status_rsp_msg_q,1,uint32_t);
+    contex->query_lock_status_rsp_msg_q_id = osMessageCreate(osMessageQ(query_lock_status_rsp_msg_q),0);
+    log_assert(contex->query_lock_status_rsp_msg_q_id);
+    /*门状态回应消息队列*/
+    osMessageQDef(query_door_status_rsp_msg_q,1,uint32_t);
+    contex->query_door_status_rsp_msg_q_id = osMessageCreate(osMessageQ(query_door_status_rsp_msg_q),0);
+    log_assert(contex->query_door_status_rsp_msg_q_id);
+    /*净重回应消息队列*/
+    osMessageQDef(net_weight_rsp_msg_q,1,uint32_t);
+    contex->net_weight_rsp_msg_q_id = osMessageCreate(osMessageQ(net_weight_rsp_msg_q),0);
+    log_assert(contex->net_weight_rsp_msg_q_id);
+    /*去皮回应消息队列*/
+    osMessageQDef(remove_tare_rsp_msg_q,1,uint32_t);
+    contex->remove_tare_rsp_msg_q_id = osMessageCreate(osMessageQ(remove_tare_rsp_msg_q),0);
+    log_assert(contex->remove_tare_rsp_msg_q_id);
+    /*0点校准回应消息队列*/
+    osMessageQDef(calibration_zero_rsp_msg_q,1,uint32_t);
+    contex->calibration_zero_rsp_msg_q_id = osMessageCreate(osMessageQ(calibration_zero_rsp_msg_q),0);
+    log_assert(contex->calibration_zero_rsp_msg_q_id);
+    /*增益校准回应消息队列*/
+    osMessageQDef(calibration_full_rsp_msg_q,1,uint32_t);
+    contex->calibration_full_rsp_msg_q_id = osMessageCreate(osMessageQ(calibration_full_rsp_msg_q),0);
+    log_assert(contex->calibration_full_rsp_msg_q_id);
+
+    contex->initialized = true;
 }
        
 /*
@@ -1050,9 +1369,8 @@ void communication_task(void const * argument)
                     COMMUNICATION_TASK_SERIAL_STOPBITS);
     log_assert(rc == 0); 
 
-    communication_scale_contex_init(&scale_contex);
-
-    log_debug("communication task ok.\r\n");
+    communication_task_contex_init(&communication_task_contex);
+    log_debug("communication task contex init ok.\r\n");
 
     /*清空接收缓存*/
     serial_flush(communication_serial_handle);

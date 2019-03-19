@@ -2148,16 +2148,28 @@
             <group>
                 <name>tasks</name>
                 <file>
+                    <name>$PROJ_DIR$\..\user\tasks\adc_task.c</name>
+                </file>
+                <file>
                     <name>$PROJ_DIR$\..\user\tasks\communication_task.c</name>
                 </file>
                 <file>
+                    <name>$PROJ_DIR$\..\user\tasks\compressor_task.c</name>
+                </file>
+                <file>
                     <name>$PROJ_DIR$\..\user\tasks\cpu_task.c</name>
+                </file>
+                <file>
+                    <name>$PROJ_DIR$\..\user\tasks\lock_task.c</name>
                 </file>
                 <file>
                     <name>$PROJ_DIR$\..\user\tasks\scale_task.c</name>
                 </file>
                 <file>
                     <name>$PROJ_DIR$\..\user\tasks\tasks_init.c</name>
+                </file>
+                <file>
+                    <name>$PROJ_DIR$\..\user\tasks\temperature_task.c</name>
                 </file>
             </group>
             <group>
