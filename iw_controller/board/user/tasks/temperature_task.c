@@ -8,7 +8,7 @@
 #include "log.h"
 
 /*任务句柄*/
-osThreadId   temperature_task_handle;
+osThreadId   temperature_task_hdl;
 /*消息句柄*/
 osMessageQId temperature_task_msg_q_id;
 
@@ -169,7 +169,7 @@ void temperature_task(void const *argument)
 
     osEvent  os_event;
     osStatus status;
-    temperature_task_message_t adc_completed_msg;
+    temperature_task_message_t req_msg,rsp_msg;
     compressor_task_message_t update_msg;
     uint16_t bypass_r_adc;
     int16_t t_int;
@@ -181,11 +181,11 @@ void temperature_task(void const *argument)
     while (1) {
         os_event = osMessageGet(temperature_task_msg_q_id,TEMPERATURE_TASK_MSG_WAIT_TIMEOUT);
         if (os_event.status == osEventMessage){
-            adc_completed_msg = *(temperature_task_message_t*)&os_event.value.v;
+            req_msg = *(temperature_task_message_t*)os_event.value.v;
  
             /*温度ADC转换完成消息处理*/
-            if (adc_completed_msg.request.type == TEMPERATURE_TASK_MSG_TYPE_ADC_COMPLETED){
-                bypass_r_adc = adc_completed_msg.request.adc;
+            if (req_msg.request.type == TEMPERATURE_TASK_MSG_TYPE_ADC_COMPLETED){
+                bypass_r_adc = req_msg.request.adc;
                 if (is_adc_valid(bypass_r_adc) == false) {
                     if (temperature.err == false) {    
                         temperature.err = true;
@@ -238,6 +238,23 @@ void temperature_task(void const *argument)
                     } 
                 }
             }
+
+        /*温度查询消息处理*/
+        if (req_msg.request.type == TEMPERATURE_TASK_MSG_TYPE_TEMPERATURE){
+            rsp_msg.response.type = TEMPERATURE_TASK_MSG_TYPE_RSP_TEMPERATURE;
+            if (temperature.err == true) {
+                rsp_msg.response.err = true;
+            } else {
+                rsp_msg.response.err = false;
+                rsp_msg.response.temperature_int = temperature.value_int;
+                rsp_msg.response.temperature_float = temperature.value_float;
+            }
+            status = osMessagePut(req_msg.request.rsp_message_queue_id,(uint32_t)&rsp_msg,TEMPERATURE_TASK_PUT_MSG_TIMEOUT);
+           if (status !=osOK) {
+               log_error("put temperature msg error:%d\r\n",status); 
+           }          
+        }
+
         }
     }
 }

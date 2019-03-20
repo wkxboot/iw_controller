@@ -14,7 +14,7 @@
 
 COMPRESSOR_TASK_BEGIN
 
-extern osThreadId   compressor_task_handle;
+extern osThreadId   compressor_task_hdl;
 extern osMessageQId compressor_task_msg_q_id;
 
 void compressor_task(void const *argument);
@@ -40,7 +40,7 @@ enum
 {
   COMPRESSOR_TASK_MSG_TYPE_TEMPERATURE_UPDATE,
   COMPRESSOR_TASK_MSG_TYPE_TEMPERATURE_ERR,
-  COMPRESSOR_TASK_MSG_TYPE_REQ_UPDATE_STATUS,
+  COMPRESSOR_TASK_MSG_TYPE_UPDATE_STATUS,
   COMPRESSOR_TASK_MSG_TYPE_WORK_TIMEOUT,
   COMPRESSOR_TASK_MSG_TYPE_WAIT_TIMEOUT,
   COMPRESSOR_TASK_MSG_TYPE_REST_TIMEOUT,

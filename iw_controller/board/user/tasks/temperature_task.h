@@ -1,7 +1,7 @@
 #ifndef  __TEMPERATURE_TASK_H__
 #define  __TEMPERATURE_TASK_H__
 #include "stdint.h"
-
+#include "stdbool.h"
 
 #ifdef  __cplusplus
 #define TEMPERATURE_TASK_BEGIN  extern "C" {
@@ -14,7 +14,7 @@
 
 TEMPERATURE_TASK_BEGIN
 
-extern osThreadId   temperature_task_handle;
+extern osThreadId   temperature_task_hdl;
 extern osMessageQId temperature_task_msg_q_id;
 
 void temperature_task(void const *argument);
@@ -43,7 +43,9 @@ void temperature_task(void const *argument);
 
 enum
 {
-    TEMPERATURE_TASK_MSG_TYPE_ADC_COMPLETED
+    TEMPERATURE_TASK_MSG_TYPE_ADC_COMPLETED,
+    TEMPERATURE_TASK_MSG_TYPE_TEMPERATURE,
+    TEMPERATURE_TASK_MSG_TYPE_RSP_TEMPERATURE
 };
 
 typedef struct
@@ -59,7 +61,9 @@ typedef struct
     struct
     {
         uint8_t type;/*回应的消息类型*/
-        uint8_t result;/*回应的结果*/
+        bool err;/*温度是否错误*/
+        int16_t temperature_int;/*回应的温度整数*/
+        float temperature_float;/*回应的温度整数*/
     }response;
     };
 }temperature_task_message_t;/*温度任务消息体*/

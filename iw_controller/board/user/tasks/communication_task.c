@@ -7,14 +7,17 @@
 #include "scale_task.h"
 #include "lock_task.h"
 #include "temperature_task.h"
+#include "compressor_task.h"
 #include "communication_task.h"
 #include "log.h"
 
-int communication_serial_handle;
-extern serial_hal_driver_t nxp_serial_uart_hal_driver;
-extern void nxp_serial_uart_hal_isr(int handle);
 osThreadId   communication_task_hdl;
 osMessageQId communication_task_msg_q_id;
+int communication_serial_handle;
+
+extern serial_hal_driver_t nxp_serial_uart_hal_driver;
+extern void nxp_serial_uart_hal_isr(int handle);
+/*通信任务上文实体*/
 static communication_task_contex_t communication_task_contex;
 
 
@@ -257,34 +260,35 @@ static int query_net_weight(const communication_task_contex_t *contex,const uint
     osStatus status;
     osEvent os_event;
 
-    scale_task_message_t req_msg,rsp_msg;
+    scale_task_message_t req_msg[SCALE_CNT_MAX],rsp_msg;
     utils_timer_t timer;
-
-    req_msg.request.type = SCALE_TASK_MSG_TYPE_QUERY_NET_WEIGHT;
-    req_msg.request.rsp_message_queue_id = contex->net_weight_rsp_msg_q_id;
 
     utils_timer_init(&timer,ADU_RSP_TIMEOUT,false);
     /*全部电子秤任务*/
     if (addr == 0) {      
         /*发送消息*/
-        for (uint8_t i = 0;i < contex->cnt;i ++) { 
-            req_msg.request.addr = contex->scale_task_contex[i].internal_addr;
-            req_msg.request.index = i;
+        for (uint8_t i = 0;i < contex->cnt;i ++) {
+            req_msg[i].request.type = SCALE_TASK_MSG_TYPE_NET_WEIGHT;
+            req_msg[i].request.rsp_message_queue_id = contex->net_weight_rsp_msg_q_id; 
+            req_msg[i].request.addr = contex->scale_task_contex[i].internal_addr;
+            req_msg[i].request.index = i;
             flags |= contex->scale_task_contex[i].flag;
-            status = osMessagePut(contex->scale_task_contex[i].msg_q_id,(uint32_t)&req_msg,utils_timer_value(&timer));
+            status = osMessagePut(contex->scale_task_contex[i].msg_q_id,(uint32_t)&req_msg[i],utils_timer_value(&timer));
             log_assert(status == osOK);
         }
-    cnt = contex->cnt;
+        cnt = contex->cnt;
     } else {/*指定电子秤任务*/
         rc = find_scale_task_contex_index(contex,addr);
         if (rc < 0) {
             log_error("scale addr:%d invlaid.\r\n",addr);
             return -1;
         }    
-        req_msg.request.addr = addr;
-        req_msg.request.index = 0;
+        req_msg[0].request.type = SCALE_TASK_MSG_TYPE_NET_WEIGHT;
+        req_msg[0].request.rsp_message_queue_id = contex->net_weight_rsp_msg_q_id;
+        req_msg[0].request.addr = addr;
+        req_msg[0].request.index = 0;
         flags |= contex->scale_task_contex[rc].flag;
-        status = osMessagePut(contex->scale_task_contex[rc].msg_q_id,(uint32_t)&req_msg,utils_timer_value(&timer));
+        status = osMessagePut(contex->scale_task_contex[rc].msg_q_id,(uint32_t)&req_msg[0],utils_timer_value(&timer));
         log_assert(status == osOK);
         cnt = 1;
     }
@@ -293,7 +297,7 @@ static int query_net_weight(const communication_task_contex_t *contex,const uint
         os_event = osMessageGet(contex->net_weight_rsp_msg_q_id,utils_timer_value(&timer));
         if (os_event.status == osEventMessage ){
             rsp_msg = *(scale_task_message_t *)os_event.value.v;
-            if (rsp_msg.response.type != SCALE_TASK_MSG_TYPE_RSP_QUERY_NET_WEIGHT) {     
+            if (rsp_msg.response.type != SCALE_TASK_MSG_TYPE_RSP_NET_WEIGHT) {     
                 log_error("comm net weight rsp type:%d err.\r\n",rsp_msg.response.type);
                 return -1;
             }
@@ -326,22 +330,21 @@ static int remove_tare_weight(const communication_task_contex_t *contex,const ui
     osStatus status;
     osEvent os_event;
 
-    scale_task_message_t req_msg,rsp_msg;
+    scale_task_message_t req_msg[SCALE_CNT_MAX],rsp_msg;
     utils_timer_t timer;
     bool success = true;
-
-    req_msg.request.type = SCALE_TASK_MSG_TYPE_REMOVE_TARE_WEIGHT;
-    req_msg.request.rsp_message_queue_id = contex->remove_tare_rsp_msg_q_id;
 
     utils_timer_init(&timer,ADU_RSP_TIMEOUT,false);
     /*全部电子秤任务*/
     if (addr == 0) {      
         /*发送消息*/
         for (uint8_t i = 0;i < contex->cnt;i ++) { 
-            req_msg.request.addr = contex->scale_task_contex[i].internal_addr;
-            req_msg.request.index = i;
+            req_msg[i].request.type = SCALE_TASK_MSG_TYPE_REMOVE_TARE_WEIGHT;
+            req_msg[i].request.rsp_message_queue_id = contex->remove_tare_rsp_msg_q_id;
+            req_msg[i].request.addr = contex->scale_task_contex[i].internal_addr;
+            req_msg[i].request.index = i;
             flags |= contex->scale_task_contex[i].flag;
-            status = osMessagePut(contex->scale_task_contex[i].msg_q_id,(uint32_t)&req_msg,utils_timer_value(&timer));
+            status = osMessagePut(contex->scale_task_contex[i].msg_q_id,(uint32_t)&req_msg[i],utils_timer_value(&timer));
             log_assert(status == osOK);
         }
     } else {/*指定电子秤任务*/
@@ -349,11 +352,13 @@ static int remove_tare_weight(const communication_task_contex_t *contex,const ui
         if (rc < 0) {
             log_error("scale addr:%d invlaid.\r\n",addr);
             return -1;
-        }    
-        req_msg.request.addr = addr;
-        req_msg.request.index = 0;
+        }   
+        req_msg[0].request.type = SCALE_TASK_MSG_TYPE_REMOVE_TARE_WEIGHT;
+        req_msg[0].request.rsp_message_queue_id = contex->remove_tare_rsp_msg_q_id; 
+        req_msg[0].request.addr = addr;
+        req_msg[0].request.index = 0;
         flags |= contex->scale_task_contex[rc].flag;
-        status = osMessagePut(contex->scale_task_contex[rc].msg_q_id,(uint32_t)&req_msg,utils_timer_value(&timer));
+        status = osMessagePut(contex->scale_task_contex[rc].msg_q_id,(uint32_t)&req_msg[0],utils_timer_value(&timer));
         log_assert(status == osOK);
     }
     /*等待消息*/
@@ -364,7 +369,7 @@ static int remove_tare_weight(const communication_task_contex_t *contex,const ui
             if (rsp_msg.response.type != SCALE_TASK_MSG_TYPE_RSP_REMOVE_TARE_WEIGHT) {     
                 log_error("comm remove tare weight rsp type:%d err.\r\n",rsp_msg.response.type);
             }
-            if (rsp_msg.response.result == SCALE_TASK_RESULT_FAIL) {
+            if (rsp_msg.response.result == SCALE_TASK_FAIL) {
                 success = false;
             }
             flags ^= rsp_msg.response.flag;
@@ -395,7 +400,7 @@ static int calibration_zero(const communication_task_contex_t *contex,const uint
     osStatus status;
     osEvent os_event;
 
-    scale_task_message_t req_msg,rsp_msg;
+    scale_task_message_t req_msg[SCALE_CNT_MAX],rsp_msg;
     utils_timer_t timer;
     bool success = true;
 
@@ -403,18 +408,19 @@ static int calibration_zero(const communication_task_contex_t *contex,const uint
         log_error("calibration zero weight:%d != 0 err.\r\n",weight);
         return -1;
     }
-    req_msg.request.type = SCALE_TASK_MSG_TYPE_CALIBRATION_ZERO_WEIGHT;    
-    req_msg.request.rsp_message_queue_id = contex->calibration_zero_rsp_msg_q_id;
-    req_msg.request.weight = weight;
     utils_timer_init(&timer,ADU_RSP_TIMEOUT,false);
+
     /*全部电子秤任务*/
     if (addr == 0) {      
         /*发送消息*/
         for (uint8_t i = 0;i < contex->cnt;i ++) { 
-            req_msg.request.addr = contex->scale_task_contex[i].internal_addr;
-            req_msg.request.index = i;
+            req_msg[i].request.type = SCALE_TASK_MSG_TYPE_CALIBRATION_ZERO_WEIGHT;    
+            req_msg[i].request.rsp_message_queue_id = contex->calibration_zero_rsp_msg_q_id;
+            req_msg[i].request.weight = weight;
+            req_msg[i].request.addr = contex->scale_task_contex[i].internal_addr;
+            req_msg[i].request.index = i;
             flags |= contex->scale_task_contex[i].flag;
-            status = osMessagePut(contex->scale_task_contex[i].msg_q_id,(uint32_t)&req_msg,utils_timer_value(&timer));
+            status = osMessagePut(contex->scale_task_contex[i].msg_q_id,(uint32_t)&req_msg[i],utils_timer_value(&timer));
             log_assert(status == osOK);
         }
     } else {/*指定电子秤任务*/
@@ -423,10 +429,13 @@ static int calibration_zero(const communication_task_contex_t *contex,const uint
             log_error("scale addr:%d invlaid.\r\n",addr);
             return -1;
         }    
-        req_msg.request.addr = addr;
-        req_msg.request.index = 0;
+        req_msg[0].request.type = SCALE_TASK_MSG_TYPE_CALIBRATION_ZERO_WEIGHT;    
+        req_msg[0].request.rsp_message_queue_id = contex->calibration_zero_rsp_msg_q_id;
+        req_msg[0].request.weight = weight;
+        req_msg[0].request.addr = addr;
+        req_msg[0].request.index = 0;
         flags |= contex->scale_task_contex[rc].flag;
-        status = osMessagePut(contex->scale_task_contex[rc].msg_q_id,(uint32_t)&req_msg,utils_timer_value(&timer));
+        status = osMessagePut(contex->scale_task_contex[rc].msg_q_id,(uint32_t)&req_msg[0],utils_timer_value(&timer));
         log_assert(status == osOK);
     }
     /*等待消息*/
@@ -437,7 +446,7 @@ static int calibration_zero(const communication_task_contex_t *contex,const uint
             if (rsp_msg.response.type != SCALE_TASK_MSG_TYPE_RSP_CALIBRATION_ZERO_WEIGHT) {     
                 log_error("comm calibration zero weight rsp type:%d err.\r\n",rsp_msg.response.type);
             }
-            if (rsp_msg.response.result == SCALE_TASK_RESULT_FAIL) {
+            if (rsp_msg.response.result == SCALE_TASK_FAIL) {
                 success = false;
             }
             flags ^= rsp_msg.response.flag;
@@ -468,7 +477,7 @@ static int calibration_full(const communication_task_contex_t *contex,const uint
     osStatus status;
     osEvent os_event;
 
-    scale_task_message_t req_msg,rsp_msg;
+    scale_task_message_t req_msg[SCALE_CNT_MAX],rsp_msg;
     utils_timer_t timer;
     bool success = true;
 
@@ -476,18 +485,19 @@ static int calibration_full(const communication_task_contex_t *contex,const uint
         log_error("calibration full weight:%d <= 0 err.\r\n",weight);
         return -1;
     }
-    req_msg.request.type = SCALE_TASK_MSG_TYPE_CALIBRATION_FULL_WEIGHT;    
-    req_msg.request.rsp_message_queue_id = contex->calibration_full_rsp_msg_q_id;
-    req_msg.request.weight = weight;
     utils_timer_init(&timer,ADU_RSP_TIMEOUT,false);
+
     /*全部电子秤任务*/
     if (addr == 0) {      
         /*发送消息*/
         for (uint8_t i = 0;i < contex->cnt;i ++) { 
-            req_msg.request.addr = contex->scale_task_contex[i].internal_addr;
-            req_msg.request.index = i;
+            req_msg[i].request.type = SCALE_TASK_MSG_TYPE_CALIBRATION_FULL_WEIGHT;    
+            req_msg[i].request.rsp_message_queue_id = contex->calibration_full_rsp_msg_q_id;
+            req_msg[i].request.weight = weight;
+            req_msg[i].request.addr = contex->scale_task_contex[i].internal_addr;
+            req_msg[i].request.index = i;
             flags |= contex->scale_task_contex[i].flag;
-            status = osMessagePut(contex->scale_task_contex[i].msg_q_id,(uint32_t)&req_msg,utils_timer_value(&timer));
+            status = osMessagePut(contex->scale_task_contex[i].msg_q_id,(uint32_t)&req_msg[i],utils_timer_value(&timer));
             log_assert(status == osOK);
         }
     } else {/*指定电子秤任务*/
@@ -495,11 +505,13 @@ static int calibration_full(const communication_task_contex_t *contex,const uint
         if (rc < 0) {
             log_error("scale addr:%d invlaid.\r\n",addr);
             return -1;
-        }    
-        req_msg.request.addr = addr;
-        req_msg.request.index = 0;
+        }  
+        req_msg[0].request.type = SCALE_TASK_MSG_TYPE_CALIBRATION_FULL_WEIGHT;    
+        req_msg[0].request.rsp_message_queue_id = contex->calibration_full_rsp_msg_q_id;  
+        req_msg[0].request.addr = addr;
+        req_msg[0].request.index = 0;
         flags |= contex->scale_task_contex[rc].flag;
-        status = osMessagePut(contex->scale_task_contex[rc].msg_q_id,(uint32_t)&req_msg,utils_timer_value(&timer));
+        status = osMessagePut(contex->scale_task_contex[rc].msg_q_id,(uint32_t)&req_msg[0],utils_timer_value(&timer));
         log_assert(status == osOK);
     }
     /*等待消息*/
@@ -511,7 +523,7 @@ static int calibration_full(const communication_task_contex_t *contex,const uint
                 log_error("comm calibration full weight rsp type:%d err.\r\n",rsp_msg.response.type);
                 return -1;
             }
-            if (rsp_msg.response.result == SCALE_TASK_RESULT_FAIL) {
+            if (rsp_msg.response.result == SCALE_TASK_FAIL) {
                 success = false;
             }
             flags ^= rsp_msg.response.flag;
@@ -543,7 +555,7 @@ static int query_door_status(communication_task_contex_t *contex,uint8_t *door_s
     lock_task_message_t req_msg,rsp_msg;
     utils_timer_t timer;
 
-    req_msg.request.type = LOCK_TASK_MSG_TYPE_QUERY_DOOR_STATUS;    
+    req_msg.request.type = LOCK_TASK_MSG_TYPE_DOOR_STATUS;    
     req_msg.request.rsp_message_queue_id = contex->query_door_status_rsp_msg_q_id;
     utils_timer_init(&timer,ADU_RSP_TIMEOUT,false);
     
@@ -556,7 +568,7 @@ static int query_door_status(communication_task_contex_t *contex,uint8_t *door_s
         os_event = osMessageGet(contex->query_door_status_rsp_msg_q_id,utils_timer_value(&timer));
         if (os_event.status == osEventMessage ){
             rsp_msg = *(lock_task_message_t *)os_event.value.v;
-            if (rsp_msg.response.type != LOCK_TASK_MSG_TYPE_RSP_QUERY_DOOR_STATUS) {     
+            if (rsp_msg.response.type != LOCK_TASK_MSG_TYPE_RSP_DOOR_STATUS) {     
                 log_error("comm query door status rsp type:%d err.\r\n",rsp_msg.response.type);
                 return -1;
             }
@@ -585,7 +597,7 @@ static int query_lock_status(communication_task_contex_t *contex,uint8_t *lock_s
     lock_task_message_t req_msg,rsp_msg;
     utils_timer_t timer;
 
-    req_msg.request.type = LOCK_TASK_MSG_TYPE_QUERY_LOCK_STATUS;    
+    req_msg.request.type = LOCK_TASK_MSG_TYPE_LOCK_STATUS;    
     req_msg.request.rsp_message_queue_id = contex->query_lock_status_rsp_msg_q_id;
     utils_timer_init(&timer,ADU_RSP_TIMEOUT,false);
     
@@ -598,7 +610,7 @@ static int query_lock_status(communication_task_contex_t *contex,uint8_t *lock_s
         os_event = osMessageGet(contex->query_lock_status_rsp_msg_q_id,utils_timer_value(&timer));
         if (os_event.status == osEventMessage ){
             rsp_msg = *(lock_task_message_t *)os_event.value.v;
-            if (rsp_msg.response.type != LOCK_TASK_MSG_TYPE_RSP_QUERY_LOCK_STATUS) {     
+            if (rsp_msg.response.type != LOCK_TASK_MSG_TYPE_RSP_LOCK_STATUS) {     
                 log_error("comm query lock status rsp type:%d err.\r\n",rsp_msg.response.type);
                 return -1;
             }
@@ -628,7 +640,7 @@ static int unlock_lock(communication_task_contex_t *contex)
     lock_task_message_t req_msg,rsp_msg;
     utils_timer_t timer;
 
-    req_msg.request.type = LOCK_TASK_MSG_TYPE_REQ_UNLOCK_LOCK;    
+    req_msg.request.type = LOCK_TASK_MSG_TYPE_UNLOCK_LOCK;    
     req_msg.request.rsp_message_queue_id = contex->unlock_lock_rsp_msg_q_id;
     utils_timer_init(&timer,ADU_RSP_TIMEOUT,false);
     
@@ -645,7 +657,7 @@ static int unlock_lock(communication_task_contex_t *contex)
                 log_error("comm unlock lock rsp type:%d err.\r\n",rsp_msg.response.type);
                 return -1;
             }
-            return rsp_msg.response.result == LOCK_TASK_RESULT_SUCCESS ? 0 : -1;
+            return rsp_msg.response.result == LOCK_TASK_SUCCESS ? 0 : -1;
             
         }
     }
@@ -669,7 +681,7 @@ static int lock_lock(communication_task_contex_t *contex)
     lock_task_message_t req_msg,rsp_msg;
     utils_timer_t timer;
 
-    req_msg.request.type = LOCK_TASK_MSG_TYPE_REQ_LOCK_LOCK;    
+    req_msg.request.type = LOCK_TASK_MSG_TYPE_LOCK_LOCK;    
     req_msg.request.rsp_message_queue_id = contex->lock_lock_rsp_msg_q_id;
     utils_timer_init(&timer,ADU_RSP_TIMEOUT,false);
     
@@ -687,7 +699,7 @@ static int lock_lock(communication_task_contex_t *contex)
                 log_error("comm lock lock rsp type:%d err.\r\n",rsp_msg.response.type);
                 return -1;
             }
-            return rsp_msg.response.result == LOCK_TASK_RESULT_SUCCESS ? 0 : -1;
+            return rsp_msg.response.result == LOCK_TASK_SUCCESS ? 0 : -1;
         }
     }
         
@@ -703,7 +715,6 @@ static int lock_lock(communication_task_contex_t *contex)
 * @return  0 成功
 * @note
 */
-
 static int query_temperature(communication_task_contex_t *contex,int8_t *temperature)
 {
     osStatus status;
@@ -712,7 +723,7 @@ static int query_temperature(communication_task_contex_t *contex,int8_t *tempera
     temperature_task_message_t req_msg,rsp_msg;
     utils_timer_t timer;
 
-    req_msg.request.type = TEMPERATURE_TASK_MSG_TYPE_QUERY_TEMPERATURE;    
+    req_msg.request.type = TEMPERATURE_TASK_MSG_TYPE_TEMPERATURE;    
     req_msg.request.rsp_message_queue_id = contex->query_temperature_rsp_msg_q_id;
     utils_timer_init(&timer,ADU_RSP_TIMEOUT,false);
     
@@ -725,12 +736,16 @@ static int query_temperature(communication_task_contex_t *contex,int8_t *tempera
     while (utils_timer_value(&timer) > 0) {
         os_event = osMessageGet(contex->query_temperature_rsp_msg_q_id,utils_timer_value(&timer));
         if (os_event.status == osEventMessage ){
-            rsp_msg = *(lock_task_message_t *)os_event.value.v;
-            if (rsp_msg.response.type != LOCK_TASK_MSG_TYPE_RSP_QUERY_TEMPERATURE) {     
+            rsp_msg = *(temperature_task_message_t *)os_event.value.v;
+            if (rsp_msg.response.type != TEMPERATURE_TASK_MSG_TYPE_RSP_TEMPERATURE) {     
                 log_error("comm query temperature rsp type:%d err.\r\n",rsp_msg.response.type);
                 return -1;
             }
-            *temperature = rsp_msg.response.temperature_int;
+            if (rsp_msg.response.err == false) {
+                *temperature = rsp_msg.response.temperature_int;
+            } else {
+                *temperature = DATA_TEMPERATURE_ERR_VALUE;
+            }
             return 0;
         }
     }
@@ -768,12 +783,12 @@ static int set_temperature_level(communication_task_contex_t *contex,uint8_t lev
     while (utils_timer_value(&timer) > 0) {
         os_event = osMessageGet(contex->set_temperature_level_rsp_msg_q_id,utils_timer_value(&timer));
         if (os_event.status == osEventMessage ){
-            rsp_msg = *(lock_task_message_t *)os_event.value.v;
-            if (rsp_msg.response.type != LOCK_TASK_MSG_TYPE_RSP_SET_TEMPERATURE_LEVEL) {     
+            rsp_msg = *(compressor_task_message_t *)os_event.value.v;
+            if (rsp_msg.response.type != COMPRESSOR_TASK_MSG_TYPE_RSP_SET_TEMPERATURE_LEVEL) {     
                 log_error("comm set temperature level rsp type:%d err.\r\n",rsp_msg.response.type);
                 return -1;
             }
-            return rsp_msg.response.result == COMPRESSOR_TASK_RESULT_SUCCESS ? 0 : -1;
+            return rsp_msg.response.result == COMPRESSOR_TASK_SUCCESS ? 0 : -1;
         }
     }
         
@@ -1015,7 +1030,7 @@ static int parse_adu(uint8_t *adu,uint8_t size,uint8_t *rsp)
                 return -1;
             }
             log_debug("query lock status...\r\n");
-            rc = query_door_status(&communication_task_contex,&status);
+            rc = query_lock_status(&communication_task_contex,&status);
             if (rc != 0) {
                 log_error("query lock status internal err.\r\n");
                 return -1;

@@ -39,26 +39,154 @@
 #include "pin_mux.h"
 
 
-/*系统运行灯*/
-static void bsp_sys_led_pin_init()
+/*压缩机开关控制引脚初始化*/
+static void bsp_compressor_ctrl_pin_init(void)
 {
     gpio_pin_config_t pin;
     pin.pinDirection = kGPIO_DigitalOutput;
-    pin.outputLogic = 1;
-    GPIO_PortInit(SYS_LED_GPIO, SYS_LED_PORT);
-    GPIO_PinInit(SYS_LED_GPIO,SYS_LED_PORT,SYS_LED_PIN,&pin);
+    pin.outputLogic = 0;
+    GPIO_PortInit(COMPRESSOR_CTRL_GPIO, COMPRESSOR_CTRL_PORT);
+    GPIO_PinInit(COMPRESSOR_CTRL_GPIO,COMPRESSOR_CTRL_PORT,COMPRESSOR_CTRL_PIN,&pin);
+}
+
+/*开压缩机*/
+void bsp_compressor_ctrl_pwr_on(void)
+{
+    GPIO_PortSet(COMPRESSOR_CTRL_GPIO,COMPRESSOR_CTRL_PORT,(1U << COMPRESSOR_CTRL_PIN));
+}
+
+/*关压缩机*/
+void bsp_compressor_ctrl_pwr_off()
+{
+    GPIO_PortClear(COMPRESSOR_CTRL_GPIO,COMPRESSOR_CTRL_PORT,(1U << COMPRESSOR_CTRL_PIN));
 }
 
 
-/*板级初始化*/
-int bsp_board_init()
+/*锁开关控制引脚初始化*/
+static void bsp_lock_ctrl_pin_init()
 {
-    //bsp_sys_led_pin_init();
+    gpio_pin_config_t pin;
+    pin.pinDirection = kGPIO_DigitalOutput;
+    pin.outputLogic = 0;
+    GPIO_PortInit(LOCK_CTRL_GPIO, LOCK_CTRL_PORT);
+    GPIO_PinInit(LOCK_CTRL_GPIO,LOCK_CTRL_PORT,LOCK_CTRL_PIN,&pin);
+}
+
+/*开锁*/
+void bsp_lock_ctrl_open(void)
+{
+    GPIO_PortSet(LOCK_CTRL_GPIO,LOCK_CTRL_PORT,(1U << LOCK_CTRL_PIN));
+}
+
+/*关锁*/
+void bsp_lock_ctrl_close()
+{
+    GPIO_PortClear( LOCK_CTRL_GPIO,LOCK_CTRL_PORT,(1U << LOCK_CTRL_PIN));
+}
+
+/*锁舌传感器*/
+static void bsp_lock_sensor_pin_init()
+{
+    gpio_pin_config_t pin;
+    pin.pinDirection = kGPIO_DigitalInput;
+    pin.outputLogic = 1;
+    GPIO_PortInit(LOCK_SENSOR_GPIO, LOCK_SENSOR_PORT);
+    GPIO_PinInit(LOCK_SENSOR_GPIO,LOCK_SENSOR_PORT,LOCK_SENSOR_PIN,&pin);
+}
+
+/*锁孔内传感器*/
+static void bsp_hole_sensor_pin_init()
+{
+    gpio_pin_config_t pin;
+    pin.pinDirection = kGPIO_DigitalInput;
+    pin.outputLogic = 1;
+    GPIO_PortInit(LOCK_HOLE_SENSOR_GPIO, LOCK_HOLE_SENSOR_PORT);
+    GPIO_PinInit(LOCK_HOLE_SENSOR_GPIO,LOCK_HOLE_SENSOR_PORT,LOCK_HOLE_SENSOR_PIN,&pin);
+}
+
+/*门磁传感器*/
+static void bsp_door_sensor_pin_init(void)
+{
+    gpio_pin_config_t pin;
+    pin.pinDirection = kGPIO_DigitalInput;
+    pin.outputLogic = 1;
+    GPIO_PortInit(DOOR_SENSOR_GPIO, DOOR_SENSOR_PORT);
+    GPIO_PinInit(DOOR_SENSOR_GPIO,DOOR_SENSOR_PORT,DOOR_SENSOR_PIN,&pin);
+}
+
+/*锁舌传感器相关*/
+uint8_t bsp_lock_sensor_status()
+{
+    uint8_t pin_level,status;
+    pin_level = GPIO_PinRead(LOCK_SENSOR_GPIO,LOCK_SENSOR_PORT,LOCK_SENSOR_PIN);
+    if (pin_level == BSP_LOCK_UNLOCKED_LEVEL) {
+        status = BSP_LOCK_STATUS_UNLOCKED;
+    } else {
+        status = BSP_LOCK_STATUS_LOCKED;
+    }
+    return status;
+}
+
+/*锁孔传感器相关*/
+uint8_t bsp_hole_sensor_status()
+{
+    uint8_t pin_level,status;
+    pin_level = GPIO_PinRead(LOCK_HOLE_SENSOR_GPIO,LOCK_HOLE_SENSOR_PORT,LOCK_HOLE_SENSOR_PIN);
+    if (pin_level == BSP_HOLE_OPEN_LEVEL) {
+        status = BSP_HOLE_STATUS_OPEN;
+    } else {
+        status = BSP_HOLE_STATUS_CLOSE;
+    }
+    return status;
+}
+/*门磁传感器*/
+uint8_t bsp_door_sensor_status()
+{
+    uint8_t pin_level,status;
+    pin_level = GPIO_PinRead(DOOR_SENSOR_GPIO,DOOR_SENSOR_PORT,DOOR_SENSOR_PIN);
+    if (pin_level == BSP_DOOR_OPEN_LEVEL) {
+        status = BSP_DOOR_STATUS_OPEN;
+    } else {
+        status = BSP_DOOR_STATUS_CLOSE;
+    }
+    return status;
+}
+
+/*数据灯相关*/
+/*
+void bsp_data_stream_led_toggle()
+{
+    GPIO_PortToggle(DATA_STREAM_LED_GPIO,DATA_STREAM_LED_PORT,(1<<DATA_STREAM_LED_PIN));
+}
+
+void bsp_data_stream_led_on()
+{
+    GPIO_PortSet(DATA_STREAM_LED_GPIO,DATA_STREAM_LED_PORT,(1U<<DATA_STREAM_LED_PIN));
+}
+
+void bsp_data_stream_led_off()
+{
+    GPIO_PortClear( DATA_STREAM_LED_GPIO,DATA_STREAM_LED_PORT,(1U<<DATA_STREAM_LED_PIN));
+}
+
+void bsp_sys_led_toggle()
+{
+    GPIO_PortToggle(SYS_LED_GPIO,SYS_LED_PORT,(1<<SYS_LED_PIN));
+}
+*/
+
+/*板级初始化*/
+int bsp_board_init(void)
+{
+    bsp_compressor_ctrl_pin_init();
+    bsp_lock_ctrl_pin_init();
+    bsp_lock_sensor_pin_init();
+    bsp_hole_sensor_pin_init();
+    bsp_door_sensor_pin_init();
 
     BOARD_InitBootPins();
     BOARD_BootClockPLL180M();
 
     return 0;
 }
-
 

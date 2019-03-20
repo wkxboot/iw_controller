@@ -23,7 +23,13 @@ static volatile uint16_t adc_average[2];
 
 static adc_result_info_t gAdcResultInfoStruct;
 adc_result_info_t *volatile gAdcResultInfoPtr = &gAdcResultInfoStruct;
-
+/*
+* @brief adc模块中断句柄
+* @param 无
+* @param
+* @return 无
+* @note
+*/
 void  ADC0_SEQA_IRQHandler()
 {
     if (kADC_ConvSeqAInterruptFlag & ADC_GetStatusFlags(TEMPERATURE_ADC)) {
@@ -34,8 +40,14 @@ void  ADC0_SEQA_IRQHandler()
     }
  
 }
-
-static int adc_clk_pwr_config()
+/*
+* @brief adc模块时钟电源配置
+* @param 无
+* @param
+* @return 无
+* @note
+*/
+static int adc_clk_pwr_config(void)
 {
     /* SYSCON power. */
     POWER_DisablePD(kPDRUNCFG_PD_VDDA);    /* Power on VDDA. */
@@ -48,8 +60,14 @@ static int adc_clk_pwr_config()
     CLOCK_EnableClock(kCLOCK_Adc0); 
     return 0;
 }
-
-static int adc_converter_init()
+/*
+* @brief adc模块初始化
+* @param 无
+* @param
+* @return 无
+* @note
+*/
+static int adc_converter_init(void)
 {
     adc_config_t adcConfigStruct;
     adc_conv_seq_config_t adcConvSeqConfigStruct;
@@ -88,34 +106,64 @@ static int adc_converter_init()
   
     return 0;
 }
-
-static int adc_start()
+/*
+* @brief adc模块启动
+* @param 无
+* @param
+* @return 无
+* @note
+*/
+static int adc_start(void)
 {
     ADC_DoSoftwareTriggerConvSeqA(TEMPERATURE_ADC); 
     return 0;
 }
-
-static int adc_stop()
+/*
+* @brief adc模块停止
+* @param 无
+* @param
+* @return 无
+* @note
+*/
+static int adc_stop(void)
 {
     return 0;
 }
 
-
-static void adc_calibration()
+/*
+* @brief adc模块校准
+* @param 无
+* @param
+* @return 无
+* @note
+*/
+static void adc_calibration(void)
 {
     if (ADC_DoSelfCalibration(TEMPERATURE_ADC) == false) {
         log_error("t adc calibrate err.\r\n");
     }
 }
-
-static void adc_reset()
+/*
+* @brief adc模块复位
+* @param 无
+* @param
+* @return 无
+* @note
+*/
+static void adc_reset(void)
 {
     adc_clk_pwr_config();
     adc_calibration();
     adc_converter_init();
 }
 
-
+/*
+* @brief adc任务
+* @param argument 任务参数
+* @param
+* @return 无
+* @note
+*/
 void adc_task(void const * argument)
 {
     int rc;

@@ -1,10 +1,10 @@
 #ifndef  __COMMUNICATION_H__
 #define  __COMMUNICATION_H__
+#include "stdbool.h"
 
-
-extern osThreadId   controller_task_hdl;
-extern osMessageQId controller_task_msg_q_id;
-void controller_task(void const * argument);
+extern osThreadId   communication_task_hdl;
+extern osMessageQId communication_task_msg_q_id;
+void communication_task(void const * argument);
 
 
 
@@ -49,8 +49,9 @@ typedef struct
 /*通信任务上下文*/
 typedef struct
 {
-    uint8_t cnt;
     bool initialized;
+    uint8_t manufacturer_id;
+    uint8_t cnt;
     scale_task_contex_t scale_task_contex[SCALE_CNT_MAX];
     osMessageQId net_weight_rsp_msg_q_id;
     osMessageQId remove_tare_rsp_msg_q_id;
@@ -61,7 +62,7 @@ typedef struct
     osMessageQId lock_lock_rsp_msg_q_id;
     osMessageQId unlock_lock_rsp_msg_q_id;
     osMessageQId query_temperature_rsp_msg_q_id;
-    osMessageQId set_temperature_rsp_msg_q_id;
+    osMessageQId set_temperature_level_rsp_msg_q_id;
 }communication_task_contex_t;
     
 

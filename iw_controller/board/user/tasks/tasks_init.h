@@ -14,8 +14,7 @@
 
 TASKS_BEGIN
 
-extern EventGroupHandle_t tasks_sync_evt_group_hdl;
-void tasks_init();
+void tasks_init(void);
 
 
 TASKS_END

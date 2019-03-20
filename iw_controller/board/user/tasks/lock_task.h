@@ -1,19 +1,19 @@
-#ifndef  __DOOR_LOCK_TASK_H__
-#define  __DOOR_LOCK_TASK_H__
+#ifndef  __LOCK_TASK_H__
+#define  __LOCK_TASK_H__
 
 
 
-extern osThreadId   door_lock_task_hdl;
-extern osMessageQId door_lock_task_msg_q_id;
-void door_lock_task(void const * argument);
+extern osThreadId   lock_task_hdl;
+extern osMessageQId lock_task_msg_q_id;
+void lock_task(void const * argument);
 
 
-#define  DOOR_LOCK_TASK_MSG_WAIT_TIMEOUT_VALUE       osWaitForever
-#define  DOOR_LOCK_TASK_PUT_MSG_TIMEOUT_VALUE        5
-#define  DOOR_LOCK_TASK_LOCK_TIMEOUT_VALUE           1700
-#define  DOOR_LOCK_TASK_SENSOR_TIMER_TIMEOUT_VALUE   10
+#define  LOCK_TASK_MSG_WAIT_TIMEOUT                 osWaitForever
+#define  LOCK_TASK_PUT_MSG_TIMEOUT                  5
+#define  LOCK_TASK_LOCK_TIMEOUT                     1700
+#define  LOCK_TASK_LOCK_CONTROLLER_TIMER_TIMEOUT    10
 /*状态稳定时间*/
-#define  LOCK_DOOR_TASK_STATUS_STABLE_TIME           100
+#define  LOCK_TASK_STATUS_HOLD_ON_TIME              100
 
 
 /*锁任务状态和结果定义*/
@@ -23,21 +23,21 @@ void door_lock_task(void const * argument);
 #define  LOCK_TASK_STATUS_LOCK_LOCKED                3
 #define  LOCK_TASK_STATUS_LOCK_UNLOCKED              4
 
-#define  LOCK_TASK_RESULT_SUCCESS                    5
-#define  LOCK_TASK_RESULT_FAIL                       6
+#define  LOCK_TASK_SUCCESS                           5
+#define  LOCK_TASK_FAIL                              6
 
 /*锁任务消息*/
 
 enum
 {
-    LOCK_TASK_MSG_TYPE_REQ_LOCK_LOCK,
-    LOCK_TASK_MSG_TYPE_REQ_UNLOCK_LOCK,
-    LOCK_TASK_MSG_TYPE_QUERY_LOCK_STATUS,
-    LOCK_TASK_MSG_TYPE_QUERY_DOOR_STATUS,
+    LOCK_TASK_MSG_TYPE_LOCK_LOCK,
+    LOCK_TASK_MSG_TYPE_UNLOCK_LOCK,
+    LOCK_TASK_MSG_TYPE_LOCK_STATUS,
+    LOCK_TASK_MSG_TYPE_DOOR_STATUS,
     LOCK_TASK_MSG_TYPE_RSP_LOCK_LOCK_RESULT,
     LOCK_TASK_MSG_TYPE_RSP_UNLOCK_LOCK_RESULT,
-    LOCK_TASK_MSG_TYPE_RSP_QUERY_LOCK_STATUS,
-    LOCK_TASK_MSG_TYPE_RSP_QUERY_DOOR_STATUS
+    LOCK_TASK_MSG_TYPE_RSP_LOCK_STATUS,
+    LOCK_TASK_MSG_TYPE_RSP_DOOR_STATUS
 };
 
 typedef struct
