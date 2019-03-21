@@ -50,51 +50,59 @@ extern "C" {
 /*******************************************************************************
  * API
  ******************************************************************************/
-#define  SYS_LED_GPIO                  GPIO
-#define  SYS_LED_PORT                  0
-#define  SYS_LED_PIN                   7   U 
+#define  SYS_LED_GPIO                       GPIO
+#define  SYS_LED_PORT                       0
+#define  SYS_LED_PIN                        7U 
 
-#define  COMPRESSOR_CTRL_GPIO          GPIO
-#define  COMPRESSOR_CTRL_PORT          1
-#define  COMPRESSOR_CTRL_PIN           1U
+#define  COMPRESSOR_CTRL_GPIO               GPIO
+#define  COMPRESSOR_CTRL_PORT               0
+#define  COMPRESSOR_CTRL_PIN                23U
 
-#define  LOCK_CTRL_GPIO                GPIO
-#define  LOCK_CTRL_PORT                0
-#define  LOCK_CTRL_PIN                 31U
-
-#define  LOCK_SENSOR_GPIO              GPIO
-#define  LOCK_SENSOR_PORT              1
-#define  LOCK_SENSOR_PIN               6U
-
-#define  LOCK_HOLE_SENSOR_GPIO         GPIO
-#define  LOCK_HOLE_SENSOR_PORT         0
-#define  LOCK_HOLE_SENSOR_PIN          8U
+#define  UNLOCK_SW_GPIO                     GPIO
+#define  UNLOCK_SW_PORT                     1
+#define  UNLOCK_SW_PIN                      3U
   
-#define  DOOR_SENSOR_GPIO              GPIO
-#define  DOOR_SENSOR_PORT              1
-#define  DOOR_SENSOR_PIN               19U
+#define  LOCK_CTRL_GPIO                     GPIO
+#define  LOCK_CTRL_PORT                     1
+#define  LOCK_CTRL_PIN                      19U
 
-#define  BSP_LOCK_UNLOCKED_LEVEL       0
-#define  BSP_LOCK_LOCKED_LEVEL         1
+#define  LOCK_SENSOR_GPIO                   GPIO
+#define  LOCK_SENSOR_PORT                   1
+#define  LOCK_SENSOR_PIN                    7U
 
-#define  BSP_HOLE_OPEN_LEVEL           1
-#define  BSP_HOLE_CLOSE_LEVEL          0
+#define  HOLE_SENSOR_GPIO                   GPIO
+#define  HOLE_SENSOR_PORT                   1
+#define  HOLE_SENSOR_PIN                    1U
+  
+#define  DOOR_SENSOR_GPIO                   GPIO
+#define  DOOR_SENSOR_PORT                   1
+#define  DOOR_SENSOR_PIN                    20U
 
-#define  BSP_DOOR_OPEN_LEVEL           1
-#define  BSP_DOOR_CLOSE_LEVEL          0
+#define  BSP_UNLOCK_SW_STATUS_PRESS_LEVEL   0
+#define  BSP_UNLOCK_SW_STATUS_RELEASE_LEVEL 4
+
+#define  BSP_LOCK_UNLOCKED_LEVEL            0
+#define  BSP_LOCK_LOCKED_LEVEL              1
+
+#define  BSP_HOLE_OPEN_LEVEL                1
+#define  BSP_HOLE_CLOSE_LEVEL               0
+
+#define  BSP_DOOR_OPEN_LEVEL                1
+#define  BSP_DOOR_CLOSE_LEVEL               0
 
 
    
-#define  BSP_DOOR_STATUS_OPEN          0x11
-#define  BSP_DOOR_STATUS_CLOSE         0x22
+#define  BSP_DOOR_STATUS_OPEN              0x11
+#define  BSP_DOOR_STATUS_CLOSE             0x22
   
-#define  BSP_LOCK_STATUS_UNLOCKED      0x33
-#define  BSP_LOCK_STATUS_LOCKED        0x44
+#define  BSP_LOCK_STATUS_UNLOCKED          0x33
+#define  BSP_LOCK_STATUS_LOCKED            0x44
 
-#define  BSP_HOLE_STATUS_OPEN          0x55
-#define  BSP_HOLE_STATUS_CLOSE         0x66
+#define  BSP_HOLE_STATUS_OPEN              0x55
+#define  BSP_HOLE_STATUS_CLOSE             0x66
 
-
+#define  BSP_UNLOCK_SW_STATUS_PRESS        0x77
+#define  BSP_UNLOCK_SW_STATUS_RELEASE      0x88
 
   
 int bsp_board_init(void);

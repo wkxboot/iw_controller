@@ -35,8 +35,8 @@ static communication_task_contex_t communication_task_contex;
 #define  CODE_QUERY_NET_WEIGHT                      0x03  
 #define  CODE_QUERY_SCALE_CNT                       0x04  
 #define  CODE_QUERY_DOOR_STATUS                     0x11  
-#define  CODE_LOCK_LOCK                             0x21   
-#define  CODE_UNLOCK_LOCK                           0x22  
+#define  CODE_UNLOCK_LOCK                           0x21   
+#define  CODE_LOCK_LOCK                             0x22  
 #define  CODE_QUERY_LOCK_STATUS                     0x23  
 #define  CODE_QUERY_TEMPERATURE                     0x41  
 #define  CODE_SET_TEMPERATURE                       0x0A 
@@ -63,13 +63,13 @@ static communication_task_contex_t communication_task_contex;
 #define  DATA_REGION_STATUS_OFFSET                  0
 
 /*协议操作值定义*/
-#define  DATA_NET_WEIGHT_ERR_VALUE                  0x7FFF
+#define  DATA_NET_WEIGHT_ERR_VALUE                  0xFFFF
 #define  DATA_TEMPERATURE_ERR_VALUE                 0x7F
 #define  DATA_STATUS_DOOR_OPEN                      0x01
 #define  DATA_STATUS_DOOR_CLOSE                     0x00
 #define  DATA_STATUS_DOOR_ERR                       0xFF
-#define  DATA_STATUS_LOCK_LOCKED                    0x01
-#define  DATA_STATUS_LOCK_UNLOCKED                  0x00
+#define  DATA_STATUS_LOCK_UNLOCKED                  0x01
+#define  DATA_STATUS_LOCK_LOCKED                    0x00
 #define  DATA_STATUS_LOCK_ERR                       0xFF
 #define  DATA_RESULT_LOCK_SUCCESS                   0x01
 #define  DATA_RESULT_LOCK_FAIL                      0x00
@@ -81,15 +81,18 @@ static communication_task_contex_t communication_task_contex;
 #define  DATA_RESULT_CALIBRATION_FAIL               0x00
 #define  DATA_RESULT_SET_TEMPERATURE_SUCCESS        0x01
 #define  DATA_RESULT_SET_TEMPERATURE_FAIL           0x00
+#define  DATA_MANUFACTURER_CHANGHONG_ID             0x1101
 /*CRC16域*/
 #define  ADU_CRC_SIZE                               2
 
 
 /*协议时间*/
-#define  ADU_WAIT_TIMEOUT              osWaitForever
-#define  ADU_FRAME_TIMEOUT             3
-#define  ADU_RSP_TIMEOUT               200
-#define  ADU_SEND_TIMEOUT              5
+#define  ADU_WAIT_TIMEOUT                           osWaitForever
+#define  ADU_FRAME_TIMEOUT                          3
+#define  ADU_RSP_TIMEOUT                            200
+#define  ADU_LOCK_RSP_TIMEOUT                       600
+#define  ADU_SCALE_CNT_MAX                          20
+#define  ADU_SEND_TIMEOUT                           5
 
 
 
@@ -188,8 +191,8 @@ static uint8_t adu_add_crc16(uint8_t *adu,uint8_t size)
     uint16_t crc16;
     crc16 = calculate_crc16(adu,size);
 
-    adu[size ++] = crc16 & 0xff;
-    adu[size ++] = crc16 >> 8;
+    adu[size ++] = (crc16 >> 8) & 0xFF ;
+    adu[size ++] = crc16 & 0xFF;
     return size;
 }
 
@@ -642,7 +645,7 @@ static int unlock_lock(communication_task_contex_t *contex)
 
     req_msg.request.type = LOCK_TASK_MSG_TYPE_UNLOCK_LOCK;    
     req_msg.request.rsp_message_queue_id = contex->unlock_lock_rsp_msg_q_id;
-    utils_timer_init(&timer,ADU_RSP_TIMEOUT,false);
+    utils_timer_init(&timer,ADU_LOCK_RSP_TIMEOUT,false);
     
     /*发送消息*/
     status = osMessagePut(lock_task_msg_q_id,(uint32_t)&req_msg,utils_timer_value(&timer));
@@ -683,7 +686,7 @@ static int lock_lock(communication_task_contex_t *contex)
 
     req_msg.request.type = LOCK_TASK_MSG_TYPE_LOCK_LOCK;    
     req_msg.request.rsp_message_queue_id = contex->lock_lock_rsp_msg_q_id;
-    utils_timer_init(&timer,ADU_RSP_TIMEOUT,false);
+    utils_timer_init(&timer,ADU_LOCK_RSP_TIMEOUT,false);
     
     /*发送消息*/
 
@@ -805,7 +808,7 @@ static int set_temperature_level(communication_task_contex_t *contex,uint8_t lev
 * @note
 */
 
-static int query_manufacturer(communication_task_contex_t *contex,uint8_t *manufacturer)
+static int query_manufacturer(communication_task_contex_t *contex,uint16_t *manufacturer)
 {
     *manufacturer = contex->manufacturer_id;
     return 0;
@@ -880,7 +883,7 @@ static int parse_adu(uint8_t *adu,uint8_t size,uint8_t *rsp)
     uint8_t code;
     uint8_t scale_addr;
     uint8_t temperature_level;
-    uint8_t manufacturer_id;
+    uint16_t manufacturer_id;
     uint16_t calibration_weight;
     uint16_t crc_received,crc_calculated;
 
@@ -958,19 +961,34 @@ static int parse_adu(uint8_t *adu,uint8_t size,uint8_t *rsp)
             log_debug("scale addr:%d query net weight...\r\n",scale_addr);
             
             rc = query_net_weight(&communication_task_contex,scale_addr,net_weight);
-            if (rc != 0) {
+            if (rc <= 0) {
                 log_error("query net weight internal err.\r\n");
                 return -1;
             } 
-            for (uint8_t i = 0; i < SCALE_CNT_MAX; i++) {
+            uint8_t index_end;
+            if (scale_addr == 0) {
+                index_end = ADU_SCALE_CNT_MAX;
+            } else {
+                index_end = 1;
+            }
+
+            for (uint8_t i = 0; i < index_end; i++) {
                 if (i < rc) {
+                    /*区别协议传感器故障值*/
+                    if (net_weight[i] == -1) {
+                        net_weight[i] = 0;
+                    /*转换为协议传感器故障值*/
+                    } else if (net_weight[i] == SCALE_TASK_NET_WEIGHT_ERR_VALUE) {
+                        net_weight[i] = DATA_NET_WEIGHT_ERR_VALUE;
+                    }
                     rsp[rsp_offset ++] = (net_weight[i] >> 8) & 0xFF;
                     rsp[rsp_offset ++] =  net_weight[i]  & 0xFF;
                 } else {
                     rsp[rsp_offset ++] = 0;
-                    rsp[rsp_offset ++] =  0;
+                    rsp[rsp_offset ++] = 0;
                 }
-            }
+               
+            } 
             break;
         case CODE_QUERY_SCALE_CNT:/*电子秤数量*/
             if (size != ADU_DATA_REGION_QUERY_SCALE_CNT_SIZE) {
@@ -1075,7 +1093,8 @@ static int parse_adu(uint8_t *adu,uint8_t size,uint8_t *rsp)
             }
             log_debug("query manufacture...\r\n");
             query_manufacturer(&communication_task_contex,&manufacturer_id);
-            rsp[rsp_offset ++] = manufacturer_id;           
+            rsp[rsp_offset ++] = (manufacturer_id >> 8) & 0xFF;      
+            rsp[rsp_offset ++] = manufacturer_id & 0xFF;      
             break;  
         default:
             log_error("unknow code:%d err.\r\n",code);
@@ -1304,6 +1323,7 @@ static void communication_task_contex_init(communication_task_contex_t *contex)
         contex->scale_task_contex[i].baud_rates = SCALE_TASK_SERIAL_BAUDRATES;
         contex->scale_task_contex[i].data_bits = SCALE_TASK_SERIAL_DATABITS;
         contex->scale_task_contex[i].stop_bits = SCALE_TASK_SERIAL_STOPBITS;
+        contex->scale_task_contex[i].flag = 1 << i;
 
         rc = serial_create(&contex->scale_task_contex[i].handle,SCALE_TASK_RX_BUFFER_SIZE,SCALE_TASK_RX_BUFFER_SIZE);
         log_assert(rc == 0);
@@ -1319,6 +1339,10 @@ static void communication_task_contex_init(communication_task_contex_t *contex)
         /*清空接收缓存*/
         serial_flush(contex->scale_task_contex[i].handle);
 
+        /*创建电子秤消息队列*/
+        osMessageQDef(scale_task_msg_queue,1,uint32_t);
+        contex->scale_task_contex[i].msg_q_id = osMessageCreate(osMessageQ(scale_task_msg_queue),0);
+        log_assert(contex->scale_task_contex[i].msg_q_id);
         /*创建电子秤任务*/
         osThreadDef(scale_task, scale_task, osPriorityNormal, 0, 256);
         contex->scale_task_contex[i].task_hdl = osThreadCreate(osThread(scale_task),&contex->scale_task_contex[i]);
@@ -1340,20 +1364,29 @@ static void communication_task_contex_init(communication_task_contex_t *contex)
     osMessageQDef(query_door_status_rsp_msg_q,1,uint32_t);
     contex->query_door_status_rsp_msg_q_id = osMessageCreate(osMessageQ(query_door_status_rsp_msg_q),0);
     log_assert(contex->query_door_status_rsp_msg_q_id);
+    /*温度回应消息队列*/
+    osMessageQDef(query_temperature_rsp_msg_q,1,uint32_t);
+    contex->query_temperature_rsp_msg_q_id = osMessageCreate(osMessageQ(query_temperature_rsp_msg_q),0);
+    log_assert(contex->query_temperature_rsp_msg_q_id);
+    /*设置温度等级消息队列*/
+    osMessageQDef(set_temperature_level_rsp_msg_q,1,uint32_t);
+    contex->set_temperature_level_rsp_msg_q_id = osMessageCreate(osMessageQ(set_temperature_level_rsp_msg_q),0);
+    log_assert(contex->set_temperature_level_rsp_msg_q_id);
+
     /*净重回应消息队列*/
-    osMessageQDef(net_weight_rsp_msg_q,1,uint32_t);
+    osMessageQDef(net_weight_rsp_msg_q,SCALE_CNT_MAX,uint32_t);
     contex->net_weight_rsp_msg_q_id = osMessageCreate(osMessageQ(net_weight_rsp_msg_q),0);
     log_assert(contex->net_weight_rsp_msg_q_id);
     /*去皮回应消息队列*/
-    osMessageQDef(remove_tare_rsp_msg_q,1,uint32_t);
+    osMessageQDef(remove_tare_rsp_msg_q,SCALE_CNT_MAX,uint32_t);
     contex->remove_tare_rsp_msg_q_id = osMessageCreate(osMessageQ(remove_tare_rsp_msg_q),0);
     log_assert(contex->remove_tare_rsp_msg_q_id);
     /*0点校准回应消息队列*/
-    osMessageQDef(calibration_zero_rsp_msg_q,1,uint32_t);
+    osMessageQDef(calibration_zero_rsp_msg_q,SCALE_CNT_MAX,uint32_t);
     contex->calibration_zero_rsp_msg_q_id = osMessageCreate(osMessageQ(calibration_zero_rsp_msg_q),0);
     log_assert(contex->calibration_zero_rsp_msg_q_id);
     /*增益校准回应消息队列*/
-    osMessageQDef(calibration_full_rsp_msg_q,1,uint32_t);
+    osMessageQDef(calibration_full_rsp_msg_q,SCALE_CNT_MAX,uint32_t);
     contex->calibration_full_rsp_msg_q_id = osMessageCreate(osMessageQ(calibration_full_rsp_msg_q),0);
     log_assert(contex->calibration_full_rsp_msg_q_id);
 

@@ -67,7 +67,7 @@ static void bsp_lock_ctrl_pin_init()
 {
     gpio_pin_config_t pin;
     pin.pinDirection = kGPIO_DigitalOutput;
-    pin.outputLogic = 0;
+    pin.outputLogic = 1;
     GPIO_PortInit(LOCK_CTRL_GPIO, LOCK_CTRL_PORT);
     GPIO_PinInit(LOCK_CTRL_GPIO,LOCK_CTRL_PORT,LOCK_CTRL_PIN,&pin);
 }
@@ -75,13 +75,36 @@ static void bsp_lock_ctrl_pin_init()
 /*开锁*/
 void bsp_lock_ctrl_open(void)
 {
-    GPIO_PortSet(LOCK_CTRL_GPIO,LOCK_CTRL_PORT,(1U << LOCK_CTRL_PIN));
+    GPIO_PortClear(LOCK_CTRL_GPIO,LOCK_CTRL_PORT,(1U << LOCK_CTRL_PIN));
 }
 
 /*关锁*/
 void bsp_lock_ctrl_close()
 {
-    GPIO_PortClear( LOCK_CTRL_GPIO,LOCK_CTRL_PORT,(1U << LOCK_CTRL_PIN));
+    GPIO_PortSet(LOCK_CTRL_GPIO,LOCK_CTRL_PORT,(1U << LOCK_CTRL_PIN));
+}
+
+/*手动开锁按键*/
+static void bsp_unlock_sw_pin_init()
+{
+    gpio_pin_config_t pin;
+    pin.pinDirection = kGPIO_DigitalInput;
+    pin.outputLogic = 1;
+    GPIO_PortInit(UNLOCK_SW_GPIO, UNLOCK_SW_PORT);
+    GPIO_PinInit(UNLOCK_SW_GPIO,UNLOCK_SW_PORT,UNLOCK_SW_PIN,&pin);
+}
+
+/*手动开锁按键状态*/
+uint8_t bsp_unlock_sw_status()
+{
+    uint8_t pin_level,status;
+    pin_level = GPIO_PinRead(UNLOCK_SW_GPIO,UNLOCK_SW_PORT,UNLOCK_SW_PIN);
+    if (pin_level == BSP_UNLOCK_SW_STATUS_PRESS_LEVEL) {
+        status = BSP_UNLOCK_SW_STATUS_PRESS;
+    } else {
+        status = BSP_UNLOCK_SW_STATUS_RELEASE;
+    }
+    return status;
 }
 
 /*锁舌传感器*/
@@ -100,8 +123,8 @@ static void bsp_hole_sensor_pin_init()
     gpio_pin_config_t pin;
     pin.pinDirection = kGPIO_DigitalInput;
     pin.outputLogic = 1;
-    GPIO_PortInit(LOCK_HOLE_SENSOR_GPIO, LOCK_HOLE_SENSOR_PORT);
-    GPIO_PinInit(LOCK_HOLE_SENSOR_GPIO,LOCK_HOLE_SENSOR_PORT,LOCK_HOLE_SENSOR_PIN,&pin);
+    GPIO_PortInit(HOLE_SENSOR_GPIO, HOLE_SENSOR_PORT);
+    GPIO_PinInit(HOLE_SENSOR_GPIO,HOLE_SENSOR_PORT,HOLE_SENSOR_PIN,&pin);
 }
 
 /*门磁传感器*/
@@ -131,7 +154,7 @@ uint8_t bsp_lock_sensor_status()
 uint8_t bsp_hole_sensor_status()
 {
     uint8_t pin_level,status;
-    pin_level = GPIO_PinRead(LOCK_HOLE_SENSOR_GPIO,LOCK_HOLE_SENSOR_PORT,LOCK_HOLE_SENSOR_PIN);
+    pin_level = GPIO_PinRead(HOLE_SENSOR_GPIO,HOLE_SENSOR_PORT,HOLE_SENSOR_PIN);
     if (pin_level == BSP_HOLE_OPEN_LEVEL) {
         status = BSP_HOLE_STATUS_OPEN;
     } else {
@@ -179,6 +202,7 @@ void bsp_sys_led_toggle()
 int bsp_board_init(void)
 {
     bsp_compressor_ctrl_pin_init();
+    bsp_unlock_sw_pin_init();
     bsp_lock_ctrl_pin_init();
     bsp_lock_sensor_pin_init();
     bsp_hole_sensor_pin_init();

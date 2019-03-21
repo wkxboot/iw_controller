@@ -48,7 +48,7 @@ typedef enum
 /*协议时间*/
 #define  ADU_WAIT_TIMEOUT              osWaitForever
 #define  ADU_FRAME_TIMEOUT             3
-#define  ADU_RSP_TIMEOUT               200
+#define  ADU_RSP_TIMEOUT               100
 #define  ADU_SEND_TIMEOUT              5
 
 
@@ -210,7 +210,7 @@ static int send_adu(const int handle,const uint8_t *adu,const uint8_t size,const
 */
 static int receive_adu(const int handle,uint8_t *adu,uint32_t wait_timeout)
 {
-   int rc;
+    int rc;
     int read_size,read_size_total = 0;
     uint32_t timeout;
     uint16_t crc_calculated;
@@ -435,39 +435,42 @@ void scale_task(void const *argument)
             if (req_msg.request.type == SCALE_TASK_MSG_TYPE_NET_WEIGHT) { 
                 rc = scale_task_poll(task_contex->handle,task_contex->phy_addr,PDU_CODE_NET_WEIGHT,req_value,0,rsp_value);
                 if (rc < 0) {
-                    log_error("scale:% poll net weight err.\r\n",task_contex->internal_addr);
+                    net_weight_msg.response.weight = SCALE_TASK_NET_WEIGHT_ERR_VALUE;
+                    log_error("scale:%d poll net weight err.\r\n",task_contex->internal_addr);
                 } else {
-                    net_weight_msg.response.type = SCALE_TASK_MSG_TYPE_RSP_NET_WEIGHT;
                     net_weight_msg.response.weight = (uint16_t)rsp_value[1] << 8 | rsp_value[0];
                     if (net_weight_msg.response.weight == PDU_NET_WEIGHT_ERR_VALUE) {
                         net_weight_msg.response.weight = SCALE_TASK_NET_WEIGHT_ERR_VALUE;   
                     }
-                    net_weight_msg.response.index = req_msg.request.index;
-                    net_weight_msg.response.flag = task_contex->flag;
-
-                    status = osMessagePut(req_msg.request.rsp_message_queue_id,(uint32_t )&net_weight_msg,SCALE_TASK_PUT_MSG_TIMEOUT);
-                    if (status != osOK) {
-                        log_error("put net weight msg err:%d.\r\n",status);
-                    }  
                 }
+                net_weight_msg.response.type = SCALE_TASK_MSG_TYPE_RSP_NET_WEIGHT;
+                net_weight_msg.response.index = req_msg.request.index;
+                net_weight_msg.response.flag = task_contex->flag;
+
+                status = osMessagePut(req_msg.request.rsp_message_queue_id,(uint32_t )&net_weight_msg,SCALE_TASK_PUT_MSG_TIMEOUT);
+                if (status != osOK) {
+                    log_error("put net weight msg err:%d.\r\n",status);
+                }  
             }
+           
 
             /*去除皮重*/
             if (req_msg.request.type == SCALE_TASK_MSG_TYPE_REMOVE_TARE_WEIGHT) { 
                 rc = scale_task_poll(task_contex->handle,task_contex->phy_addr,PDU_CODE_REMOVE_TARE_WEIGHT,req_value,0,rsp_value);
                 if (rc < 0) {
-                    log_error("scale:% poll remove tare weight err.\r\n",task_contex->internal_addr);
+                    remove_tare_msg.response.result = SCALE_TASK_FAIL;
+                    log_error("scale:%d poll remove tare weight err.\r\n",task_contex->internal_addr);
                 } else {
-                    remove_tare_msg.response.type = SCALE_TASK_MSG_TYPE_RSP_REMOVE_TARE_WEIGHT;
                     remove_tare_msg.response.result = rsp_value[0] ==  PDU_SUCCESS_VALUE ? SCALE_TASK_SUCCESS : SCALE_TASK_FAIL;
-                    remove_tare_msg.response.index = req_msg.request.index;
-                    remove_tare_msg.response.flag = task_contex->flag;
-
-                    status = osMessagePut(req_msg.request.rsp_message_queue_id,(uint32_t )&remove_tare_msg,SCALE_TASK_PUT_MSG_TIMEOUT);
-                    if (status != osOK) {
-                        log_error("put net weight msg err:%d.\r\n",status);
-                    }            
                 }
+                remove_tare_msg.response.type = SCALE_TASK_MSG_TYPE_RSP_REMOVE_TARE_WEIGHT;
+                remove_tare_msg.response.index = req_msg.request.index;
+                remove_tare_msg.response.flag = task_contex->flag;
+
+                status = osMessagePut(req_msg.request.rsp_message_queue_id,(uint32_t )&remove_tare_msg,SCALE_TASK_PUT_MSG_TIMEOUT);
+                if (status != osOK) {
+                    log_error("put net weight msg err:%d.\r\n",status);
+                }                      
             }
 
             /*0点校准*/
@@ -476,38 +479,40 @@ void scale_task(void const *argument)
                 req_value[1] = req_msg.request.weight >> 8;
                 rc = scale_task_poll(task_contex->handle,task_contex->phy_addr,PDU_CODE_CALIBRATION_ZERO,req_value,2,rsp_value);
                 if (rc < 0) {
-                    log_error("scale:% poll calibration zero weight err.\r\n",task_contex->internal_addr);
+                    calibration_zero_msg.response.result = SCALE_TASK_FAIL;
+                    log_error("scale:%d poll calibration zero weight err.\r\n",task_contex->internal_addr);
                 } else {
-                    calibration_zero_msg.response.type = SCALE_TASK_MSG_TYPE_RSP_CALIBRATION_ZERO_WEIGHT;
                     calibration_zero_msg.response.result = rsp_value[0] ==  PDU_SUCCESS_VALUE ? SCALE_TASK_SUCCESS : SCALE_TASK_FAIL;
-                    calibration_zero_msg.response.index = req_msg.request.index;
-                    calibration_zero_msg.response.flag = task_contex->flag;
+                }
+                calibration_zero_msg.response.type = SCALE_TASK_MSG_TYPE_RSP_CALIBRATION_ZERO_WEIGHT;
+                calibration_zero_msg.response.index = req_msg.request.index;
+                calibration_zero_msg.response.flag = task_contex->flag;
 
-                    status = osMessagePut(req_msg.request.rsp_message_queue_id,(uint32_t )&calibration_zero_msg,SCALE_TASK_PUT_MSG_TIMEOUT);
-                    if (status != osOK) {
-                        log_error("put calibration zero weight msg err:%d.\r\n",status);
-                    }            
-                } 
+                status = osMessagePut(req_msg.request.rsp_message_queue_id,(uint32_t )&calibration_zero_msg,SCALE_TASK_PUT_MSG_TIMEOUT);
+                if (status != osOK) {
+                    log_error("put calibration zero weight msg err:%d.\r\n",status);
+                }                             
             }
 
             /*增益校准*/
-            if (req_msg.request.type == SCALE_TASK_MSG_TYPE_CALIBRATION_ZERO_WEIGHT) { 
+            if (req_msg.request.type == SCALE_TASK_MSG_TYPE_CALIBRATION_FULL_WEIGHT) { 
                 req_value[0] = req_msg.request.weight & 0xFF;
                 req_value[1] = req_msg.request.weight >> 8;
                 rc = scale_task_poll(task_contex->handle,task_contex->phy_addr,PDU_CODE_CALIBRATION_FULL,req_value,2,rsp_value);
                 if (rc < 0) {
-                    log_error("scale:% poll calibration full weight err.\r\n",task_contex->internal_addr);
+                    calibration_full_msg.response.result = SCALE_TASK_FAIL;
+                    log_error("scale:%d poll calibration full weight err.\r\n",task_contex->internal_addr);
                 } else {
-                    calibration_full_msg.response.type = SCALE_TASK_MSG_TYPE_RSP_CALIBRATION_FULL_WEIGHT;
-                    calibration_full_msg.response.result = rsp_value[0] ==  PDU_SUCCESS_VALUE ? SCALE_TASK_SUCCESS : SCALE_TASK_FAIL;
-                    calibration_full_msg.response.index = req_msg.request.index;
-                    calibration_full_msg.response.flag = task_contex->flag;
+                     calibration_full_msg.response.result = rsp_value[0] ==  PDU_SUCCESS_VALUE ? SCALE_TASK_SUCCESS : SCALE_TASK_FAIL;
+                }
+                calibration_full_msg.response.type = SCALE_TASK_MSG_TYPE_RSP_CALIBRATION_FULL_WEIGHT;              
+                calibration_full_msg.response.index = req_msg.request.index;
+                calibration_full_msg.response.flag = task_contex->flag;
 
-                    status = osMessagePut(req_msg.request.rsp_message_queue_id,(uint32_t )&calibration_full_msg,SCALE_TASK_PUT_MSG_TIMEOUT);
-                    if (status != osOK) {
-                        log_error("put calibration full weight msg err:%d.\r\n",status);
-                    }            
-                } 
+                status = osMessagePut(req_msg.request.rsp_message_queue_id,(uint32_t )&calibration_full_msg,SCALE_TASK_PUT_MSG_TIMEOUT);
+                if (status != osOK) {
+                    log_error("put calibration full weight msg err:%d.\r\n",status);
+                }                          
             }
         }
 

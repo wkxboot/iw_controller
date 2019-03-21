@@ -30,8 +30,8 @@
 /******************************************************************************/
 /*    配置开始                                                                */
 /******************************************************************************/
-#define  LOG_PRINTF_BUFFER_SIZE    1560
-#define  LOG_LEVEL_GLOBLE_DEFAULT  LOG_LEVEL_INFO 
+#define  LOG_PRINTF_BUFFER_SIZE    2560
+#define  LOG_LEVEL_GLOBLE_DEFAULT  LOG_LEVEL_DEBUG 
 #define  LOG_USE_RTT               1
 #define  LOG_USE_SERIAL            0
 #define  LOG_USE_COLORS            1

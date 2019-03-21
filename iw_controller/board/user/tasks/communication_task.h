@@ -50,7 +50,7 @@ typedef struct
 typedef struct
 {
     bool initialized;
-    uint8_t manufacturer_id;
+    uint16_t manufacturer_id;
     uint8_t cnt;
     scale_task_contex_t scale_task_contex[SCALE_CNT_MAX];
     osMessageQId net_weight_rsp_msg_q_id;

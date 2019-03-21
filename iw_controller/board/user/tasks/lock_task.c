@@ -198,10 +198,10 @@ void lock_task(void const *argument)
                 /*如果开锁失败，就把锁关闭*/
                 bsp_lock_ctrl_close();
                 rsp_msg.response.result = LOCK_TASK_FAIL;
-                log_debug("unlock fail.timeout.\r\n");
+                log_error("unlock fail.timeout.\r\n");
             }
    
-            status = osMessagePut(communication_task_msg_q_id,(uint32_t)&rsp_msg,LOCK_TASK_PUT_MSG_TIMEOUT);
+            status = osMessagePut(req_msg.request.rsp_message_queue_id,(uint32_t)&rsp_msg,LOCK_TASK_PUT_MSG_TIMEOUT);
             if (status != osOK){
                 log_error("lock put unlock msg err:%d.\r\n",status);
             } 
@@ -210,7 +210,7 @@ void lock_task(void const *argument)
         /*上锁*/
         if (req_msg.request.type == LOCK_TASK_MSG_TYPE_LOCK_LOCK){ 
             log_debug("lock lock...\r\n");
-            /*执行开锁操作*/
+            /*执行上锁操作*/
             bsp_lock_ctrl_close();
 
             utils_timer_init(&timer,LOCK_TASK_LOCK_TIMEOUT,false);
@@ -226,10 +226,10 @@ void lock_task(void const *argument)
                 /*如果关锁失败，就把锁打开*/
                 bsp_lock_ctrl_open();
                 rsp_msg.response.result = LOCK_TASK_FAIL;
-                log_debug("lock fail.timeout.\r\n");
+                log_error("lock fail.timeout.\r\n");
             }
    
-            status = osMessagePut(communication_task_msg_q_id,(uint32_t)&rsp_msg,LOCK_TASK_PUT_MSG_TIMEOUT);
+            status = osMessagePut(req_msg.request.rsp_message_queue_id,(uint32_t)&rsp_msg,LOCK_TASK_PUT_MSG_TIMEOUT);
             if (status != osOK){
                 log_error("lock put lock msg err:%d.\r\n",status);
             } 

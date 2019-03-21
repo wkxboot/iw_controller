@@ -82,7 +82,7 @@
                 </option>
                 <option>
                     <name>GenLowLevelInterface</name>
-                    <state>1</state>
+                    <state>0</state>
                 </option>
                 <option>
                     <name>GEndianModeBE</name>
@@ -220,7 +220,7 @@
                 <debug>1</debug>
                 <option>
                     <name>CCDefines</name>
-                    <state>CPU_LPC54606J256ET180
+                    <state>CPU_LPC54606J512BD100
 </state>
                 </option>
                 <option>
@@ -1076,11 +1076,11 @@
                 </option>
                 <option>
                     <name>Input description</name>
-                    <state></state>
+                    <state>Automatic choice of formatter, without multibyte support.</state>
                 </option>
                 <option>
                     <name>Output description</name>
-                    <state></state>
+                    <state>Automatic choice of formatter, without multibyte support.</state>
                 </option>
                 <option>
                     <name>GOutputBinary</name>
@@ -1102,7 +1102,7 @@
                 </option>
                 <option>
                     <name>RTDescription</name>
-                    <state></state>
+                    <state>Use the normal configuration of the C/C++ runtime library. No locale interface, C locale, no file descriptor support, no multibytes in printf and scanf, and no hex floats in strtod.</state>
                 </option>
                 <option>
                     <name>OGProductVersion</name>
@@ -1110,7 +1110,7 @@
                 </option>
                 <option>
                     <name>OGLastSavedByProductVersion</name>
-                    <state></state>
+                    <state>8.30.2.18207</state>
                 </option>
                 <option>
                     <name>GeneralEnableMisra</name>
@@ -1122,7 +1122,7 @@
                 </option>
                 <option>
                     <name>OGChipSelectEditMenu</name>
-                    <state></state>
+                    <state>Default	None</state>
                 </option>
                 <option>
                     <name>GenLowLevelInterface</name>
@@ -1156,7 +1156,7 @@
                 </option>
                 <option>
                     <name>RTConfigPath2</name>
-                    <state></state>
+                    <state>$TOOLKIT_DIR$\inc\c\DLib_Config_Normal.h</state>
                 </option>
                 <option>
                     <name>GBECoreSlave</name>
@@ -1182,7 +1182,7 @@
                 </option>
                 <option>
                     <name>GFPUDeviceSlave</name>
-                    <state>-</state>
+                    <state>Default	None</state>
                 </option>
                 <option>
                     <name>FPU2</name>
@@ -1373,7 +1373,7 @@
                 </option>
                 <option>
                     <name>OutputFile</name>
-                    <state></state>
+                    <state>$FILE_BNAME$.o</state>
                 </option>
                 <option>
                     <name>CCLibConfigHeader</name>
@@ -1414,7 +1414,7 @@
                 </option>
                 <option>
                     <name>CCOptLevelSlave</name>
-                    <state>1</state>
+                    <state>3</state>
                 </option>
                 <option>
                     <name>CompilerMisraRules98</name>
@@ -1639,7 +1639,7 @@
                 </option>
                 <option>
                     <name>AOutputFile</name>
-                    <state></state>
+                    <state>$FILE_BNAME$.o</state>
                 </option>
                 <option>
                     <name>ALimitErrorsCheck</name>
@@ -1744,7 +1744,7 @@
                 </option>
                 <option>
                     <name>IlinkOutputFile</name>
-                    <state>###Unitialized###</state>
+                    <state>iw_controller.out</state>
                 </option>
                 <option>
                     <name>IlinkDebugInfoEnable</name>

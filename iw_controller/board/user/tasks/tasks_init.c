@@ -20,6 +20,11 @@
 void tasks_init(void)
 {
 
+    /*通信消息队列*/
+    osMessageQDef(communication_task_msg_q,2,uint32_t);
+    communication_task_msg_q_id = osMessageCreate(osMessageQ(communication_task_msg_q),0);
+    log_assert(communication_task_msg_q_id);
+
     /*温度消息队列*/
     osMessageQDef(temperature_task_msg_q,2,uint32_t);
     temperature_task_msg_q_id = osMessageCreate(osMessageQ(temperature_task_msg_q),0);

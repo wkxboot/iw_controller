@@ -394,6 +394,8 @@ void compressor_task(void const *argument)
       
         /*温度更新消息处理*/
         if (req_msg.request.type == COMPRESSOR_TASK_MSG_TYPE_TEMPERATURE_UPDATE){ 
+            /*去除温度错误标志*/
+            compressor.temperature_err = false;
             /*缓存温度值*/
             compressor.temperature_int = req_msg.request.temperature_int; 
             compressor.temperature_float = req_msg.request.temperature_float; 

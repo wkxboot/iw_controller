@@ -10,10 +10,10 @@ void lock_task(void const * argument);
 
 #define  LOCK_TASK_MSG_WAIT_TIMEOUT                 osWaitForever
 #define  LOCK_TASK_PUT_MSG_TIMEOUT                  5
-#define  LOCK_TASK_LOCK_TIMEOUT                     1700
+#define  LOCK_TASK_LOCK_TIMEOUT                     500
 #define  LOCK_TASK_LOCK_CONTROLLER_TIMER_TIMEOUT    10
 /*状态稳定时间*/
-#define  LOCK_TASK_STATUS_HOLD_ON_TIME              100
+#define  LOCK_TASK_STATUS_HOLD_ON_TIME              50
 
 
 /*锁任务状态和结果定义*/

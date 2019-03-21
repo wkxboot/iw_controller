@@ -17,7 +17,7 @@ static volatile uint16_t adc_average[2];
 
 #define   TEMPERATURE_ADC           ADC0
 #define   TEMPERATURE_ADC_IRQ_ID    ADC0_SEQA_IRQn
-#define   TEMPERATURE_ADC_CHANNEL   0
+#define   TEMPERATURE_ADC_CHANNEL   3
 #define   TEMPERATURE_ADC_CLK_SRC   kFRO_HF_to_ADC_CLK
 
 
@@ -74,10 +74,10 @@ static int adc_converter_init(void)
 
     /* Configure the converter. */
     adcConfigStruct.clockMode = kADC_ClockSynchronousMode; /* Using sync clock source. */
-    adcConfigStruct.clockDividerNumber = 1;                /* The divider for sync clock is 2. */
+    adcConfigStruct.clockDividerNumber = 20;                /* The divider for sync clock is 2. */
     adcConfigStruct.resolution = kADC_Resolution12bit;
     adcConfigStruct.enableBypassCalibration = false;
-    adcConfigStruct.sampleTimeNumber = 0U;
+    adcConfigStruct.sampleTimeNumber = 5U;
 
     ADC_Init(TEMPERATURE_ADC, &adcConfigStruct);
 
@@ -153,8 +153,8 @@ static void adc_calibration(void)
 static void adc_reset(void)
 {
     adc_clk_pwr_config();
-    adc_calibration();
     adc_converter_init();
+    adc_calibration();
 }
 
 /*
