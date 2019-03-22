@@ -2157,7 +2157,7 @@
                     <name>$PROJ_DIR$\..\user\tasks\compressor_task.c</name>
                 </file>
                 <file>
-                    <name>$PROJ_DIR$\..\user\tasks\cpu_task.c</name>
+                    <name>$PROJ_DIR$\..\user\tasks\debug_task.c</name>
                 </file>
                 <file>
                     <name>$PROJ_DIR$\..\user\tasks\lock_task.c</name>
@@ -2170,6 +2170,9 @@
                 </file>
                 <file>
                     <name>$PROJ_DIR$\..\user\tasks\temperature_task.c</name>
+                </file>
+                <file>
+                    <name>$PROJ_DIR$\..\user\tasks\watch_dog_task.c</name>
                 </file>
             </group>
             <group>

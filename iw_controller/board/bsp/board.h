@@ -59,8 +59,8 @@ extern "C" {
 #define  COMPRESSOR_CTRL_PIN                23U
 
 #define  UNLOCK_SW_GPIO                     GPIO
-#define  UNLOCK_SW_PORT                     1
-#define  UNLOCK_SW_PIN                      3U
+#define  UNLOCK_SW_PORT                     0
+#define  UNLOCK_SW_PIN                      4U
   
 #define  LOCK_CTRL_GPIO                     GPIO
 #define  LOCK_CTRL_PORT                     1
@@ -120,6 +120,8 @@ uint8_t bsp_door_sensor_status(void);
 uint8_t bsp_lock_sensor_status(void);
 /*锁空接近传感器状态*/
 uint8_t bsp_hole_sensor_status(void);
+/*手动开锁按键状态*/
+uint8_t bsp_unlock_sw_status();
 
 
 

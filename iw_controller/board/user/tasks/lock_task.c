@@ -29,6 +29,11 @@ typedef struct
      uint8_t status;
      uint32_t hold_on_time;
     }hole_sensor;
+    struct
+    {
+    uint32_t unlock_time;
+    bool manual_unlock;
+    }manual_switch;
 }lock_controller_t;
 
 
@@ -69,6 +74,9 @@ static void lock_controller_timer_start(void)
 */
 static void lock_controller_timer_expired(void const *argument)
 { 
+    osStatus os_status;
+    static lock_task_message_t req_msg;
+
     uint8_t status;
     /*锁传感器状态轮询*/
     status = bsp_lock_sensor_status();
@@ -121,6 +129,34 @@ static void lock_controller_timer_expired(void const *argument)
     } else {
         lock_controller.door_sensor.hold_on_time = 0;
     }
+
+    /*手动按键状态轮询*/
+    status = bsp_unlock_sw_status();
+    if (status == BSP_UNLOCK_SW_STATUS_PRESS && lock_controller.manual_switch.manual_unlock == false) {
+        lock_controller.manual_switch.manual_unlock = true;
+        /*检测到手动开门*/
+        req_msg.request.type = LOCK_TASK_MSG_TYPE_MANUAL_UNLOCK_LOCK;
+        os_status = osMessagePut(lock_task_msg_q_id,(uint32_t)&req_msg,0);
+        if (os_status != osOK) {
+            log_error("put manual unlock msg err:%d.\r\n",status);
+        }
+    }
+    if (lock_controller.manual_switch.manual_unlock == true) {
+        lock_controller.manual_switch.unlock_time += LOCK_TASK_LOCK_CONTROLLER_TIMER_TIMEOUT;
+        if (lock_controller.manual_switch.unlock_time >= LOCK_TASK_MANUAL_UNLOCK_TIME) {
+            lock_controller.manual_switch.unlock_time = 0;
+            lock_controller.manual_switch.manual_unlock = false;
+            /*主动关门*/
+            req_msg.request.type = LOCK_TASK_MSG_TYPE_MANUAL_LOCK_LOCK;
+            os_status = osMessagePut(lock_task_msg_q_id,(uint32_t)&req_msg,0);
+            if (os_status != osOK) {
+                log_error("put manual lock msg err:%d.\r\n",status);
+            }
+        }
+    }
+
+       
+
 }
 
 /*
@@ -233,6 +269,35 @@ void lock_task(void const *argument)
             if (status != osOK){
                 log_error("lock put lock msg err:%d.\r\n",status);
             } 
+        }
+
+        /*手动按键开锁*/
+        if (req_msg.request.type == LOCK_TASK_MSG_TYPE_MANUAL_UNLOCK_LOCK){ 
+            log_info("manual unlock lock...\r\n");
+            /*执行开锁操作*/
+            bsp_lock_ctrl_open();
+        }
+
+        /*手动按键关锁*/
+        if (req_msg.request.type == LOCK_TASK_MSG_TYPE_MANUAL_LOCK_LOCK){ 
+            log_info("manual lock lock...\r\n");
+            /*执行开锁操作*/
+            bsp_lock_ctrl_close();
+        }
+
+
+        /*调试接口上锁*/
+        if (req_msg.request.type == LOCK_TASK_MSG_TYPE_DEBUG_LOCK_LOCK){ 
+            log_info("debug lock lock...\r\n");
+            /*执行上锁操作*/
+            bsp_lock_ctrl_close();
+        }
+
+        /*调试接口开锁*/
+        if (req_msg.request.type == LOCK_TASK_MSG_TYPE_DEBUG_UNLOCK_LOCK){ 
+            log_info("debug unlock lock...\r\n");
+            /*执行开锁操作*/
+            bsp_lock_ctrl_open();
         }
    
  }

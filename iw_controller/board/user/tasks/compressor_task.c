@@ -10,27 +10,25 @@ osThreadId   compressor_task_hdl;
 osMessageQId compressor_task_msg_q_id;
 
 /*定时器句柄*/
-osTimerId    compressor_work_timer_id;
-osTimerId    compressor_wait_timer_id;
-osTimerId    compressor_rest_timer_id;
-osTimerId    compressor_pwr_wait_timer_id;
+osTimerId    compressor_timer_id;
+
 
 
 typedef enum
 {
-    COMPRESSOR_STATUS_INIT = 0,     /*上电后的状态*/
-    COMPRESSOR_STATUS_RDY,          /*正常关机后的就绪状态*/
-    COMPRESSOR_STATUS_RDY_CONTINUE, /*长时间工作停机后的就绪状态*/
-    COMPRESSOR_STATUS_REST,         /*长时间工作后的停机状态*/
-    COMPRESSOR_STATUS_WORK,         /*压缩机工作状态*/
-    COMPRESSOR_STATUS_WAIT,         /*两次开机之间的状态*/
-    COMPRESSOR_STATUS_WAIT_CONTINUE /*异常时两次开机之间的状态*/
+    COMPRESSOR_STATUS_INIT = 0,        /*上电后的状态*/
+    COMPRESSOR_STATUS_WORK,            /*压缩机工作状态*/
+    COMPRESSOR_STATUS_STOP_RDY,        /*正常关机后的就绪状态,可以随时启动*/
+    COMPRESSOR_STATUS_STOP_REST,       /*长时间工作后的停机休息的状态*/
+    COMPRESSOR_STATUS_STOP_CONTINUE,   /*长时间工作后且停机休息完毕后的状态,需要继续治冷到达最低限温度值*/
+    COMPRESSOR_STATUS_STOP_WAIT,       /*两次开机之间的停机等待状态*/
+    COMPRESSOR_STATUS_STOP_FAULT,      /*温度传感器故障停机等待状态*/
 }compressor_status_t;
 
 typedef struct
 {
-    int8_t stop;
-    int8_t work;
+    float stop;
+    float work;
 }compressor_temperature_level_t;
 
 typedef struct
@@ -38,9 +36,11 @@ typedef struct
     compressor_status_t status;
     int8_t temperature_int;
     float temperature_float;
+
     uint8_t level;
-    int8_t temperature_stop;
-    int8_t temperature_work;
+    float temperature_stop;
+    float temperature_work;
+
     bool   temperature_err;
     compressor_temperature_level_t temperature_level[COMPRESSOR_TASK_TEMPERATURE_LEVEL_CNT];
 }compressor_t;
@@ -51,228 +51,71 @@ static compressor_t compressor ={
 .temperature_level[0] = {4, 8},
 .temperature_level[1] = {9,13},
 .temperature_level[2] = {14,18},
-.temperature_level[3] = {19,23}
+.temperature_level[3] = {19,23},
+.temperature_err = false
 };
 
-static void compressor_work_timer_init(void);
-static void compressor_wait_timer_init(void);
-static void compressor_rest_timer_init(void);
+static void compressor_timer_init(void);
 
-static void compressor_work_timer_start(void);
-static void compressor_wait_timer_start(void);
-static void compressor_rest_timer_start(void);
-
-
-static void compressor_work_timer_stop(void);
-/*
-static void compressor_wait_timer_stop(void);
-static void compressor_rest_timer_stop(void);
-*/
-
-static void compressor_work_timer_expired(void const *argument);
-static void compressor_wait_timer_expired(void const *argument);
-static void compressor_rest_timer_expired(void const *argument);
-static void compressor_pwr_wait_timer_expired(void const *argument);
+static void compressor_timer_start(uint32_t timeout);
+static void compressor_timer_stop(void);
+static void compressor_timer_expired(void const *argument);
 
 static void compressor_pwr_turn_on();
 static void compressor_pwr_turn_off();
 
 
 /*
-* @brief 工作时间定时器
+* @brief 压缩机定时器
 * @param 无
 * @return 无
 * @note
 */
-static void compressor_work_timer_init(void)
+static void compressor_timer_init(void)
 {
-    osTimerDef(compressor_work_timer,compressor_work_timer_expired);
-    compressor_work_timer_id=osTimerCreate(osTimer(compressor_work_timer),osTimerOnce,0);
-    log_assert(compressor_work_timer_id);
+    osTimerDef(compressor_timer,compressor_timer_expired);
+    compressor_timer_id=osTimerCreate(osTimer(compressor_timer),osTimerOnce,0);
+    log_assert(compressor_timer_id);
 }
+
 /*
-* @brief 工作时间定时器启动
-* @param 无
+* @brief 定时器启动
+* @param timeout 超时时间
 * @return 无
 * @note
 */
-static void compressor_work_timer_start(void)
+static void compressor_timer_start(uint32_t timeout)
 {
-    osTimerStart(compressor_work_timer_id,COMPRESSOR_TASK_WORK_TIMEOUT);  
+    osTimerStart(compressor_timer_id,timeout);  
 }
+
 /*
 * @brief 工作时间定时器停止
 * @param 无
 * @return 无
 * @note
 */
-static void compressor_work_timer_stop(void)
+
+static void compressor_timer_stop(void)
 {
-    osTimerStop(compressor_work_timer_id);  
+    osTimerStop(compressor_timer_id);  
 }
+
 /*
-* @brief 工作时间定时器回调
+* @brief 定时器回调
 * @param argument 回调参数
 * @return 无
 * @note
 */
-static void compressor_work_timer_expired(void const *argument)
+static void compressor_timer_expired(void const *argument)
 {
     osStatus status;
     static compressor_task_message_t msg;
-    /*工作超时 发送消息*/
-    msg.request.type = COMPRESSOR_TASK_MSG_TYPE_WORK_TIMEOUT;
+    /*发送消息*/
+    msg.request.type = COMPRESSOR_TASK_MSG_TYPE_TIMER_TIMEOUT;
     status = osMessagePut(compressor_task_msg_q_id,(uint32_t)&msg,COMPRESSOR_TASK_PUT_MSG_TIMEOUT);
     if (status !=osOK) {
-        log_error("compressor put work timeout msg error:%d\r\n",status);
-    } 
-}
-
-/*
-* @brief 两次开机等待定时器
-* @param 无
-* @return 无
-* @note
-*/
-static void compressor_wait_timer_init(void)
-{
-    osTimerDef(compressor_wait_timer,compressor_wait_timer_expired);
-    compressor_wait_timer_id = osTimerCreate(osTimer(compressor_wait_timer),osTimerOnce,0);
-    log_assert(compressor_wait_timer_id);
-}
-
-/*
-* @brief 两次开机等待定时器启动
-* @param 无
-* @return 无
-* @note
-*/
-static void compressor_wait_timer_start(void)
-{
-    osTimerStart(compressor_wait_timer_id,COMPRESSOR_TASK_WAIT_TIMEOUT);  
-}
-
-/*
-* @brief 两次开机等待定时器停止
-* @param 无
-* @return 无
-* @note
-*/
-/*
-static void compressor_wait_timer_stop(void)
-{
-    osTimerStop(compressor_wait_timer_id);  
-}
-*/
-/*
-* @brief 两次开机等待定时器回调
-* @param argument 回调参数
-* @return 无
-* @note
-*/
-static void compressor_wait_timer_expired(void const *argument)
-{
-    osStatus status;  
-    static compressor_task_message_t msg;
-    /*工作超时 发送消息*/
-    msg.request.type = COMPRESSOR_TASK_MSG_TYPE_WAIT_TIMEOUT;
-    status = osMessagePut(compressor_task_msg_q_id,(uint32_t)&msg,COMPRESSOR_TASK_PUT_MSG_TIMEOUT);
-    if (status !=osOK) {
-        log_error("compressor put wait timeout msg error:%d\r\n",status);
-    } 
-}
-
-/*
-* @brief 上电等待定时器
-* @param 无
-* @return 无
-* @note
-*/
-static void compressor_pwr_wait_timer_init(void)
-{
-    osTimerDef(compressor_pwr_wait_timer,compressor_pwr_wait_timer_expired);
-    compressor_pwr_wait_timer_id=osTimerCreate(osTimer(compressor_pwr_wait_timer),osTimerOnce,0);
-    log_assert(compressor_pwr_wait_timer_id);
-}
-
-/*
-* @brief 上电等待定时器启动
-* @param 无
-* @return 无
-* @note
-*/
-static void compressor_pwr_wait_timer_start(void)
-{
-    osTimerStart(compressor_pwr_wait_timer_id,COMPRESSOR_TASK_PWR_WAIT_TIMEOUT);   
-}
-/*
-* @brief 工作时间定时器回调
-* @param argument 回调参数
-* @return 无
-* @note
-*/
-static void compressor_pwr_wait_timer_expired(void const *argument)
-{
-    osStatus status;
-    static compressor_task_message_t msg;
-    /*工作超时 发送消息*/
-    msg.request.type = COMPRESSOR_TASK_MSG_TYPE_PWR_WAIT_TIMEOUT;
-    status = osMessagePut(compressor_task_msg_q_id,(uint32_t)&msg,COMPRESSOR_TASK_PUT_MSG_TIMEOUT);
-    if (status != osOK) {
-        log_error("compressor put pwr wait timeout msg error:%d\r\n",status);
-    } 
-}
-
-/*
-* @brief 休息定时器
-* @param 无
-* @return 无
-* @note
-*/
-static void compressor_rest_timer_init(void)
-{
-    osTimerDef(compressor_rest_timer,compressor_rest_timer_expired);
-    compressor_rest_timer_id = osTimerCreate(osTimer(compressor_rest_timer),osTimerOnce,0);
-    log_assert(compressor_rest_timer_id);
-}
-/*
-* @brief 休息定时器启动
-* @param 无
-* @return 无
-* @note
-*/
-static void compressor_rest_timer_start(void)
-{
-    osTimerStart(compressor_rest_timer_id,COMPRESSOR_TASK_REST_TIMEOUT);
-}
-
-/*
-* @brief 休息定时器停止
-* @param 无
-* @return 无
-* @note
-*/
-/*
-static void compressor_rest_timer_stop(void)
-{
-    osTimerStop(compressor_rest_timer_id);
-}
-*/
-/*
-* @brief 休息定时器回调
-* @param argument 回调参数
-* @return 无
-* @note
-*/
-static void compressor_rest_timer_expired(void const *argument)
-{
-    osStatus status;
-    static compressor_task_message_t msg;
-    /*工作超时 发送消息*/
-    msg.request.type = COMPRESSOR_TASK_MSG_TYPE_REST_TIMEOUT;
-    status = osMessagePut(compressor_task_msg_q_id,(uint32_t)&msg,COMPRESSOR_TASK_PUT_MSG_TIMEOUT);
-    if(status != osOK) {
-        log_error("compressor put rest timeout msg error:%d\r\n",status);
+        log_error("compressor put timeout msg error:%d\r\n",status);
     } 
 }
 
@@ -321,24 +164,133 @@ void compressor_task(void const *argument)
     /*上电先关闭压缩机*/
     compressor_pwr_turn_off();
     /*定时器初始化*/
-    compressor_work_timer_init();
-    compressor_wait_timer_init();
-    compressor_rest_timer_init();
-    compressor_pwr_wait_timer_init();
+    compressor_timer_init();
+    /*消除编译警告*/
+    compressor_timer_stop();
     /*上电等待*/
-    compressor_pwr_wait_timer_start();
+    compressor_timer_start(COMPRESSOR_TASK_PWR_ON_WAIT_TIMEOUT);
   
     while (1) {
     os_event = osMessageGet(compressor_task_msg_q_id,osWaitForever);
     if (os_event.status == osEventMessage) {     
         req_msg = *(compressor_task_message_t*)os_event.value.v;
-  
+
+        /*压缩机定时器超时消息，压缩机根据超时事件更新工作状态*/
+        if (req_msg.request.type == COMPRESSOR_TASK_MSG_TYPE_TIMER_TIMEOUT){       
+            if (compressor.status == COMPRESSOR_STATUS_INIT) {
+                /*上电等待完毕*/
+                log_info("压缩机上电等待完毕.\r\n");
+                compressor.status = COMPRESSOR_STATUS_STOP_RDY; 
+                 /*发送消息更新压缩机工作状态*/
+                req_update_msg.request.type = COMPRESSOR_TASK_MSG_TYPE_UPDATE_STATUS;
+                status = osMessagePut(compressor_task_msg_q_id,(uint32_t)&req_update_msg,COMPRESSOR_TASK_PUT_MSG_TIMEOUT);
+                if (status != osOK) {
+                    log_error("compressor put update msg timeout error:%d\r\n",status);
+                }            
+            } else if (compressor.status == COMPRESSOR_STATUS_WORK) {
+                /*压缩机工作时间到达最大时长*/
+                log_info("压缩机到达最大工作时长.停机%d分钟.\r\n",COMPRESSOR_TASK_REST_TIMEOUT / (60 * 1000));
+                compressor.status = COMPRESSOR_STATUS_STOP_REST;
+                /*关闭压缩机*/
+                compressor_pwr_turn_off(); 
+                /*等待休息完毕*/
+                compressor_timer_start(COMPRESSOR_TASK_REST_TIMEOUT);                
+            } else if (compressor.status == COMPRESSOR_STATUS_STOP_REST || compressor.status == COMPRESSOR_STATUS_STOP_WAIT || compressor.status == COMPRESSOR_STATUS_STOP_FAULT) {
+                if (compressor.status == COMPRESSOR_STATUS_STOP_REST) {
+                    /*压缩机休息完毕*/
+                    log_info("压缩机休息完毕.\r\n");
+                    compressor.status = COMPRESSOR_STATUS_STOP_CONTINUE;
+                } else if (compressor.status == COMPRESSOR_STATUS_STOP_WAIT) {
+                    /*压缩机等待完毕*/
+                    log_info("压缩机等待完毕.\r\n");
+                    compressor.status = COMPRESSOR_STATUS_STOP_RDY;
+                } else {
+                    /*压缩机传感器错误等待完毕*/
+                    log_info("压缩机温度错误等待完毕.\r\n");
+                    compressor.status = COMPRESSOR_STATUS_STOP_CONTINUE;
+                }
+                /*发送消息更新压缩机工作状态*/
+                req_update_msg.request.type = COMPRESSOR_TASK_MSG_TYPE_UPDATE_STATUS;
+                status = osMessagePut(compressor_task_msg_q_id,(uint32_t)&req_update_msg,COMPRESSOR_TASK_PUT_MSG_TIMEOUT);
+                if (status != osOK) {
+                    log_error("compressor put update msg timeout error:%d\r\n",status);
+                }          
+            } else {
+                /*压缩机休息完毕*/
+                log_warning("压缩机代码内部错误.忽略.\r\n");          
+            }
+        }
+      
+        /*温度更新消息处理*/
+        if (req_msg.request.type == COMPRESSOR_TASK_MSG_TYPE_TEMPERATURE_UPDATE){ 
+            /*去除温度错误标志*/
+            compressor.temperature_err = false;
+            /*缓存温度值*/
+            compressor.temperature_int = req_msg.request.temperature_int; 
+            compressor.temperature_float = req_msg.request.temperature_float; 
+            /*发送消息更新压缩机工作状态*/
+            req_update_msg.request.type = COMPRESSOR_TASK_MSG_TYPE_UPDATE_STATUS;
+            status = osMessagePut(compressor_task_msg_q_id,(uint32_t)&req_update_msg,COMPRESSOR_TASK_PUT_MSG_TIMEOUT);
+            if (status != osOK) {
+                log_error("compressor put update msg timeout error:%d\r\n",status);
+            }   
+        }
+
+        /*温度错误消息处理*/
+        if (req_msg.request.type == COMPRESSOR_TASK_MSG_TYPE_TEMPERATURE_ERR) { 
+            compressor.temperature_err = true;
+            if (compressor.status == COMPRESSOR_STATUS_WORK){
+                /*温度异常时，如果在工作,就变更为STOP_FAULT状态*/
+                compressor.status = COMPRESSOR_STATUS_STOP_FAULT;
+                /*关闭压缩机和工作定时器*/
+                compressor_pwr_turn_off(); 
+                /*同样打开等待定时器*/ 
+                compressor_timer_start(COMPRESSOR_TASK_WAIT_TIMEOUT);  
+                log_info("温度错误.关压缩机.等待%d分钟.\r\n",COMPRESSOR_TASK_WAIT_TIMEOUT / (60 * 1000));
+            } 
+        }
+ 
+        /*压缩机根据温度更新工作状态*/
+        if (req_msg.request.type == COMPRESSOR_TASK_MSG_TYPE_UPDATE_STATUS){ 
+            /*只有在没有温度错误和等待上电完毕后才处理压缩机的启停*/
+            if (compressor.temperature_err == false && compressor.status != COMPRESSOR_STATUS_INIT) {
+                if (compressor.temperature_float <= compressor.temperature_stop && compressor.status == COMPRESSOR_STATUS_WORK){                  
+                    compressor.status = COMPRESSOR_STATUS_STOP_WAIT;
+                    /*关闭压缩机*/
+                    compressor_pwr_turn_off(); 
+                    /*打开等待定时器*/ 
+                    compressor_timer_start(COMPRESSOR_TASK_WAIT_TIMEOUT);
+                    log_info("温度:%.2f C低于关机温度:%.2f C.关机等待%d分钟.\r\n",compressor.temperature_float,compressor.temperature_stop,COMPRESSOR_TASK_WAIT_TIMEOUT / (60 * 1000));
+                } else if (compressor.temperature_float >= compressor.temperature_work && compressor.status == COMPRESSOR_STATUS_STOP_RDY ) {       
+                    /*温度大于开机温度，同时是正常关机状态时，开机*/
+                    compressor.status = COMPRESSOR_STATUS_WORK; 
+                    /*打开压缩机*/
+                    compressor_pwr_turn_on();
+                    /*打开工作定时器*/ 
+                    compressor_timer_start(COMPRESSOR_TASK_WORK_TIMEOUT); 
+                    log_info("温度:%.2f C高于开机温度:%.2f C.正常开压缩机.\r\n",compressor.temperature_float,compressor.temperature_work);
+                }else if (compressor.temperature_float > compressor.temperature_stop && compressor.status == COMPRESSOR_STATUS_STOP_CONTINUE) {
+                    /*超时关机或者异常关机状态后，温度大于关机温度，继续开机*/ 
+                    compressor.status = COMPRESSOR_STATUS_WORK; 
+                    /*打开压缩机*/
+                    compressor_pwr_turn_on();
+                    /*打开工作定时器*/ 
+                    compressor_timer_start(COMPRESSOR_TASK_WORK_TIMEOUT); 
+                    log_info("温度:%.2f C高于关机温度:%.2f C.继续开压缩机.\r\n",compressor.temperature_float,compressor.temperature_stop);
+                } else {
+                    log_info("压缩机状态:%d无需处理.\r\n",compressor.status);
+                }
+            } else {
+                log_info("压缩机正在上电等待或者温度错误.跳过.\r\n");
+            }
+        }
+
         /*配置压缩机工作温度区间消息*/
         if (req_msg.request.type == COMPRESSOR_TASK_MSG_TYPE_SET_TEMPERATURE_LEVEL){      
             if (req_msg.request.temperature_setting < COMPRESSOR_TASK_TEMPERATURE_SETTING_MIN ||\
                 rsp_setting_msg.request.temperature_setting > COMPRESSOR_TASK_TEMPERATURE_SETTING_MAX) {
                 rsp_setting_msg.response.result = COMPRESSOR_TASK_FAIL;
-                log_error("new temperature setting:%d invalid.min:%d max:%d.\r\n.",
+                log_error("温度设置值:%.2f C无效.min:%.2f C max:%.2f C.\r\n.",
                             rsp_setting_msg.request.temperature_setting,
                             COMPRESSOR_TASK_TEMPERATURE_SETTING_MIN,
                             COMPRESSOR_TASK_TEMPERATURE_SETTING_MIN);
@@ -361,7 +313,7 @@ void compressor_task(void const *argument)
                         rsp_setting_msg.response.result = COMPRESSOR_TASK_FAIL;
                         log_error("nv flash save temperature level fail.\r\n");
                     } else {                                
-                        log_debug("temperature setting level:%d ok.from %d to %d.\r\n",level,compressor.temperature_level[level].stop,compressor.temperature_level[level].work);
+                        log_debug("温度设置值:%.2f 成功.区间 %.2f C---%.2f C.\r\n",level,compressor.temperature_level[level].stop,compressor.temperature_level[level].work);
                         /*发送消息更新压缩机工作状态*/
                         req_update_msg.request.type = COMPRESSOR_TASK_MSG_TYPE_UPDATE_STATUS;
                         status = osMessagePut(compressor_task_msg_q_id,(uint32_t)&req_update_msg,COMPRESSOR_TASK_PUT_MSG_TIMEOUT);
@@ -370,7 +322,7 @@ void compressor_task(void const *argument)
                         }                     
                     }
                 } else {
-                    log_debug("new temperature setting is same with old.skip.\r\n");
+                    log_debug("温度设置值与当前一致.跳过.\r\n");
                 }
             }
             /*发送消息给通信任务*/
@@ -379,138 +331,7 @@ void compressor_task(void const *argument)
             if (status != osOK) {
                 log_error("compressor put rsp_setting msg timeout error:%d\r\n",status);
             }                                    
-        }
-                   
-        /*压缩机上电等待完毕消息处理*/
-        if (req_msg.request.type == COMPRESSOR_TASK_MSG_TYPE_PWR_WAIT_TIMEOUT){ 
-            compressor.status = COMPRESSOR_STATUS_RDY_CONTINUE;
-            /*发送消息更新压缩机工作状态*/
-            req_update_msg.request.type = COMPRESSOR_TASK_MSG_TYPE_UPDATE_STATUS;
-            status = osMessagePut(compressor_task_msg_q_id,(uint32_t)&req_update_msg,COMPRESSOR_TASK_PUT_MSG_TIMEOUT);
-            if (status != osOK) {
-                log_error("compressor put update msg timeout error:%d\r\n",status);
-            }          
-        } 
-      
-        /*温度更新消息处理*/
-        if (req_msg.request.type == COMPRESSOR_TASK_MSG_TYPE_TEMPERATURE_UPDATE){ 
-            /*去除温度错误标志*/
-            compressor.temperature_err = false;
-            /*缓存温度值*/
-            compressor.temperature_int = req_msg.request.temperature_int; 
-            compressor.temperature_float = req_msg.request.temperature_float; 
-            /*发送消息更新压缩机工作状态*/
-            req_update_msg.request.type = COMPRESSOR_TASK_MSG_TYPE_UPDATE_STATUS;
-            status = osMessagePut(compressor_task_msg_q_id,(uint32_t)&req_update_msg,COMPRESSOR_TASK_PUT_MSG_TIMEOUT);
-            if (status != osOK) {
-                log_error("compressor put update msg timeout error:%d\r\n",status);
-            }   
-        }
-
-        /*压缩机工作状态更新*/
-        if (req_msg.request.type == COMPRESSOR_TASK_MSG_TYPE_UPDATE_STATUS){ 
-            /*只有在没有温度错误和等待上电完毕后才处理压缩机的启停*/
-            if (compressor.temperature_err == false && compressor.status != COMPRESSOR_STATUS_INIT) {
-                if (compressor.temperature_int <= compressor.temperature_stop  && compressor.status == COMPRESSOR_STATUS_WORK){
-                    log_info("温度:%d C低于关机温度:%d C.\r\n",compressor.temperature_int,compressor.temperature_stop );
-                    compressor.status = COMPRESSOR_STATUS_WAIT;
-                    log_info("compressor change status to wait.\r\n");  
-                    log_info("关压缩机.\r\n");
-                    /*关闭压缩机和工作定时器*/
-                    compressor_pwr_turn_off(); 
-                    compressor_work_timer_stop();
-                    /*打开等待定时器*/ 
-                    compressor_wait_timer_start(); 
-                } else if ((compressor.temperature_int >= compressor.temperature_work  && compressor.status == COMPRESSOR_STATUS_RDY )  || \
-                          (compressor.temperature_int > compressor.temperature_stop   && compressor.status == COMPRESSOR_STATUS_RDY_CONTINUE )){
-                    /*温度大于开机温度，同时是正常关机状态时，开机*/
-                    /*或者温度大于关机温度，同时是超时关机或者异常关机状态时，继续开机*/
-                    log_info("温度:%d C高于开机温度1:%d C 温度2:%d C.\r\n",compressor.temperature_int,compressor.temperature_work,compressor.temperature_stop);
-                    log_info("开压缩机.\r\n");
-                    compressor.status = COMPRESSOR_STATUS_WORK;
-                    log_info("compressor change status to work.\r\n");  
-                    /*打开压缩机*/
-                    compressor_pwr_turn_on();
-                    /*打开工作定时器*/ 
-                    compressor_work_timer_start(); 
-                }else{
-                    log_info("压缩机状态:%d 无需处理.\r\n",compressor.status);     
-                } 
-            } else {
-                log_info("压缩机正在上电等待或者温度错误 跳过.\r\n");
-            }
-        }
-
-        /*温度错误消息处理*/
-        if (req_msg.request.type == COMPRESSOR_TASK_MSG_TYPE_TEMPERATURE_ERR) { 
-            compressor.temperature_err = true;
-            if (compressor.status == COMPRESSOR_STATUS_WORK){
-                /*温度异常时，如果在工作,就变更为wait continue状态*/
-                compressor.status = COMPRESSOR_STATUS_WAIT_CONTINUE;
-                log_info("温度错误.\r\n"); 
-                log_info("compressor change status to wait continue.\r\n");  
-                log_info("关压缩机.\r\n");
-                /*关闭压缩机和工作定时器*/
-                compressor_pwr_turn_off(); 
-                compressor_work_timer_stop();
-                /*打开等待定时器*/ 
-                compressor_wait_timer_start();  
-            } else {
-                log_info("压缩机状态:%d 无需处理.\r\n",compressor.status);  
-            }
-        }
- 
-  
-        /*压缩机工作超时消息*/
-        if (req_msg.request.type == COMPRESSOR_TASK_MSG_TYPE_WORK_TIMEOUT) {
-            if (compressor.status == COMPRESSOR_STATUS_WORK) {
-                log_info("关压缩机.\r\n");
-                compressor.status = COMPRESSOR_STATUS_REST;
-                log_info("compressor change status to rest.\r\n");  
-                /*关闭压缩机和工作定时器*/
-                compressor_pwr_turn_off();  
-                /*打开休息定时器*/ 
-                compressor_rest_timer_start(); 
-            } else {
-                log_info("压缩机状态:%d 无需处理.\r\n",compressor.status);  
-            }
-        }
- 
-        /*压缩机等待超时消息*/
-        if (req_msg.request.type == COMPRESSOR_TASK_MSG_TYPE_WAIT_TIMEOUT) {
-            if (compressor.status == COMPRESSOR_STATUS_WAIT){
-                compressor.status = COMPRESSOR_STATUS_RDY;
-                log_info("compressor change status to rdy.\r\n");  
-            } else if (compressor.status == COMPRESSOR_STATUS_WAIT_CONTINUE) {
-                compressor.status = COMPRESSOR_STATUS_RDY_CONTINUE;
-                log_info("compressor change status to rdy continue.\r\n");  
-            } else {
-                log_info("压缩机状态:%d 无需处理.\r\n",compressor.status);     
-            }
-            /*发送消息更新压缩机工作状态*/
-            req_update_msg.request.type = COMPRESSOR_TASK_MSG_TYPE_UPDATE_STATUS;
-            status = osMessagePut(compressor_task_msg_q_id,(uint32_t)&req_update_msg,COMPRESSOR_TASK_PUT_MSG_TIMEOUT);
-            if (status != osOK) {
-                log_error("compressor put update msg timeout error:%d\r\n",status);
-            }    
-        }
- 
-        /*压缩机休息超时消息*/
-        if (req_msg.request.type == COMPRESSOR_TASK_MSG_TYPE_REST_TIMEOUT) {
-            if (compressor.status == COMPRESSOR_STATUS_REST){
-                compressor.status = COMPRESSOR_STATUS_RDY_CONTINUE;
-                log_info("compressor change status to rdy continue.\r\n");
-        
-                /*发送消息更新压缩机工作状态*/
-                req_update_msg.request.type = COMPRESSOR_TASK_MSG_TYPE_UPDATE_STATUS;
-                status = osMessagePut(compressor_task_msg_q_id,(uint32_t)&req_update_msg,COMPRESSOR_TASK_PUT_MSG_TIMEOUT);
-                if (status != osOK) {
-                    log_error("compressor put update msg timeout error:%d\r\n",status);
-                } 
-            } else {
-                log_info("压缩机状态:%d 无需处理.\r\n",compressor.status);     
-            }
-        }
+        }                         
 
 
     }

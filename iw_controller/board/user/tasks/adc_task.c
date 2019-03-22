@@ -74,7 +74,7 @@ static int adc_converter_init(void)
 
     /* Configure the converter. */
     adcConfigStruct.clockMode = kADC_ClockSynchronousMode; /* Using sync clock source. */
-    adcConfigStruct.clockDividerNumber = 20;                /* The divider for sync clock is 2. */
+    adcConfigStruct.clockDividerNumber = 20;               /* The divider for sync clock is 2. */
     adcConfigStruct.resolution = kADC_Resolution12bit;
     adcConfigStruct.enableBypassCalibration = false;
     adcConfigStruct.sampleTimeNumber = 5U;

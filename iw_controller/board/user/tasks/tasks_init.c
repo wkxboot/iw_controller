@@ -1,5 +1,6 @@
 #include "cmsis_os.h"
-#include "cpu_task.h"
+#include "debug_task.h"
+#include "watch_dog_task.h"
 #include "scale_task.h"
 #include "tasks_init.h"
 #include "adc_task.h"
@@ -19,6 +20,9 @@
 
 void tasks_init(void)
 {
+    /**************************************************************************/  
+    /* 任务消息队列                                                           */
+    /**************************************************************************/  
 
     /*通信消息队列*/
     osMessageQDef(communication_task_msg_q,2,uint32_t);
@@ -31,19 +35,27 @@ void tasks_init(void)
     log_assert(temperature_task_msg_q_id);
 
     /*压缩机消息队列*/
-    osMessageQDef(compressor_task_msg_q,2,uint32_t);
+    osMessageQDef(compressor_task_msg_q,4,uint32_t);
     compressor_task_msg_q_id = osMessageCreate(osMessageQ(compressor_task_msg_q),0);
     log_assert(compressor_task_msg_q_id);
 
     /*锁控消息队列*/
-    osMessageQDef(lock_task_msg_q,2,uint32_t);
+    osMessageQDef(lock_task_msg_q,4,uint32_t);
     lock_task_msg_q_id = osMessageCreate(osMessageQ(lock_task_msg_q),0);
     log_assert(lock_task_msg_q_id);
 
-    /*cpu任务*/
-    osThreadDef(cpu_task, cpu_task, osPriorityNormal, 0, 128);
-    cpu_task_hdl = osThreadCreate(osThread(cpu_task), NULL);
-    log_assert(cpu_task_hdl);
+    /**************************************************************************/  
+    /* 任务创建                                                               */
+    /**************************************************************************/  
+    /*调试任务*/
+    osThreadDef(debug_task, debug_task, osPriorityNormal, 0, 128);
+    debug_task_hdl = osThreadCreate(osThread(debug_task), NULL);
+    log_assert(debug_task_hdl);
+
+    /*看门狗任务*/
+    osThreadDef(watch_dog_task, watch_dog_task, osPriorityNormal, 0, 128);
+    watch_dog_task_hdl = osThreadCreate(osThread(watch_dog_task), NULL);
+    log_assert(watch_dog_task_hdl);
 
     /*锁控任务*/
     osThreadDef(lock_task, lock_task, osPriorityNormal, 0, 256);

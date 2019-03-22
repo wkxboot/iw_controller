@@ -34,6 +34,7 @@ typedef struct
     float value_float;
     int16_t value_int;
     int8_t dir;
+    uint8_t err_cnt;
     bool err;
     bool change;
 }temperature_t;
@@ -184,16 +185,20 @@ void temperature_task(void const *argument)
               
                 /*判断是否在报警范围*/ 
                 if (t_float == TEMPERATURE_ERR_VALUE || (t_float > TEMPERATURE_ALARM_VALUE_MAX || t_float < TEMPERATURE_ALARM_VALUE_MIN)) {
-                    if (temperature.err == false) {    
-                        temperature.err = true;
-                        temperature.change = true;
+                    if (temperature.err == false) {  
+                        temperature.err_cnt ++; 
+                        if (temperature.err_cnt >= TEMPERATURE_ERR_CNT) {
+                            temperature.err = true;
+                            temperature.change = true;
+                        }
                     }
                 } else {  
                     t_int = calculate_approximate_t(t_float);
                     temperature.err = false;
-                    if (t_int > temperature.value_int){
+                    temperature.err_cnt = 0;
+                    if (t_float - temperature.value_float >= TEMPERATURE_ACCURATE) {
                         temperature.dir += 1;    
-                    }else if(t_int < temperature.value_int){
+                    }else if(t_float - temperature.value_float <= -TEMPERATURE_ACCURATE) {
                         temperature.dir -= 1;      
                     } else {
                         temperature.dir = 0; 

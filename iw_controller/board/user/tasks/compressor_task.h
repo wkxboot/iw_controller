@@ -26,7 +26,7 @@ void compressor_task(void const *argument);
 
 #define  COMPRESSOR_TASK_PUT_MSG_TIMEOUT               5             /*发送消息超时时间 单位:ms*/
 
-#define  COMPRESSOR_TASK_PWR_WAIT_TIMEOUT             (2*60*1000)   /*压缩机上电后等待就绪的时间 单位:ms*/
+#define  COMPRESSOR_TASK_PWR_ON_WAIT_TIMEOUT          (2*60*1000)   /*压缩机上电后等待就绪的时间 单位:ms*/
 
 #define  COMPRESSOR_TASK_SUCCESS                       0
 #define  COMPRESSOR_TASK_FAIL                          1
@@ -44,7 +44,7 @@ enum
   COMPRESSOR_TASK_MSG_TYPE_WORK_TIMEOUT,
   COMPRESSOR_TASK_MSG_TYPE_WAIT_TIMEOUT,
   COMPRESSOR_TASK_MSG_TYPE_REST_TIMEOUT,
-  COMPRESSOR_TASK_MSG_TYPE_PWR_WAIT_TIMEOUT,
+  COMPRESSOR_TASK_MSG_TYPE_TIMER_TIMEOUT,
   COMPRESSOR_TASK_MSG_TYPE_SET_TEMPERATURE_LEVEL,
   COMPRESSOR_TASK_MSG_TYPE_RSP_SET_TEMPERATURE_LEVEL
 };
