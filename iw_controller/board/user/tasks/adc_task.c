@@ -77,7 +77,7 @@ static int adc_converter_init(void)
     adcConfigStruct.clockDividerNumber = 20;               /* The divider for sync clock is 2. */
     adcConfigStruct.resolution = kADC_Resolution12bit;
     adcConfigStruct.enableBypassCalibration = false;
-    adcConfigStruct.sampleTimeNumber = 5U;
+    adcConfigStruct.sampleTimeNumber = 200U;
 
     ADC_Init(TEMPERATURE_ADC, &adcConfigStruct);
 
@@ -91,13 +91,13 @@ static int adc_converter_init(void)
     ADC_SetConvSeqAConfig(TEMPERATURE_ADC, &adcConvSeqConfigStruct);
     ADC_EnableConvSeqA(TEMPERATURE_ADC, true); /* Enable the conversion sequence A. */
     /* Clear the result register. */
-    /*
+    
     ADC_DoSoftwareTriggerConvSeqA(TEMPERATURE_ADC);
     while (!ADC_GetChannelConversionResult(TEMPERATURE_ADC, TEMPERATURE_ADC_CHANNEL, &gAdcResultInfoStruct))
     {
     }
     ADC_GetConvSeqAGlobalConversionResult(TEMPERATURE_ADC, &gAdcResultInfoStruct);
-    */
+    
     NVIC_SetPriority(TEMPERATURE_ADC_IRQ_ID, 3);
     /* Enable the interrupt. */
     /* Enable the interrupt the for sequence A done. */
@@ -134,27 +134,29 @@ static int adc_stop(void)
 * @brief adc模块校准
 * @param 无
 * @param
-* @return 无
+* @return -1 失败
+* @return 0  成功
 * @note
 */
-static void adc_calibration(void)
+static int adc_calibration(void)
 {
     if (ADC_DoSelfCalibration(TEMPERATURE_ADC) == false) {
         log_error("t adc calibrate err.\r\n");
+        return -1;
     }
+    return 0;
 }
 /*
 * @brief adc模块复位
 * @param 无
 * @param
-* @return 无
+* @return -1 失败
+* @return 0  成功
 * @note
 */
-static void adc_reset(void)
+static int adc_reset(void)
 {
-    adc_clk_pwr_config();
-    adc_converter_init();
-    adc_calibration();
+    return 0;
 }
 
 /*
@@ -173,16 +175,18 @@ void adc_task(void const * argument)
     uint8_t t_sample_cnt = 0;
 
     adc_stop();
-    adc_reset();
+    adc_clk_pwr_config();
+    do {
+        osDelay(1000);
+        rc = adc_calibration();
+    }while (rc != 0);
+
+    adc_converter_init();
 
     while (1) {
         osDelay(ADC_TASK_INTERVAL);
-        rc = adc_start();
-        if (rc != 0) {
-            adc_reset();
-            continue;
-        } 
-  
+        adc_start();
+
         signals = osSignalWait(ADC_TASK_ALL_SIGNALS,ADC_TASK_ADC_TIMEOUT);
         if (signals.status == osEventSignal ) {
             if (signals.value.signals & ADC_TASK_ADC_COMPLETED_SIGNAL) {

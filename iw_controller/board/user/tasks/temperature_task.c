@@ -148,7 +148,7 @@ float get_float_temperature_by_adc(uint16_t adc)
         }  
     }
 
-    return 0;
+    return TEMPERATURE_ERR_VALUE;
 }
 
 
@@ -224,7 +224,7 @@ void temperature_task(void const *argument)
                     update_msg.request.type = COMPRESSOR_TASK_MSG_TYPE_TEMPERATURE_UPDATE;
                     update_msg.request.temperature_int = temperature.value_int;
                     update_msg.request.temperature_float = temperature.value_float;
-                    log_info("teperature changed dir:%d value:%d C.\r\n",temperature.dir,temperature.value_int);
+                    log_info("teperature changed dir:%d value:%.2f C.\r\n",temperature.dir,temperature.value_float);
                 }
                 temperature.change = false;       
                 temperature.dir = 0;    
