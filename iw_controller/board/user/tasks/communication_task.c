@@ -761,12 +761,12 @@ static int query_temperature(communication_task_contex_t *contex,int8_t *tempera
 /*
 * @brief 设置压缩机温度控制区间
 * @param contex 通信任务上下文
-* @param level 温度区间等级
+* @param temperature 温度
 * @return -1 失败
 * @return  0 成功
 * @note
 */
-static int set_temperature_level(communication_task_contex_t *contex,uint8_t level)
+static int set_temperature_level(communication_task_contex_t *contex,uint8_t temperature)
 {
     osStatus status;
     osEvent os_event;
@@ -776,6 +776,7 @@ static int set_temperature_level(communication_task_contex_t *contex,uint8_t lev
 
     req_msg.request.type = COMPRESSOR_TASK_MSG_TYPE_SET_TEMPERATURE_LEVEL;    
     req_msg.request.rsp_message_queue_id = contex->set_temperature_level_rsp_msg_q_id;
+    req_msg.request.temperature_setting = temperature;
     utils_timer_init(&timer,ADU_RSP_TIMEOUT,false);
     
     /*发送消息*/
@@ -882,7 +883,7 @@ static int parse_adu(uint8_t *adu,uint8_t size,uint8_t *rsp)
     uint8_t communication_addr;
     uint8_t code;
     uint8_t scale_addr;
-    uint8_t temperature_level;
+    uint8_t temperature_setting;
     uint16_t manufacturer_id;
     uint16_t calibration_weight;
     uint16_t crc_received,crc_calculated;
@@ -1077,9 +1078,9 @@ static int parse_adu(uint8_t *adu,uint8_t size,uint8_t *rsp)
                 log_error("set temperature data size:%d != %d err.\r\n",size,ADU_DATA_REGION_SET_TEMPERATURE_SIZE);
                 return -1;
             }
-            temperature_level = adu[ADU_DATA_REGION_OFFSET + DATA_REGION_TEMPERATURE_OFFSET];
-            log_debug("set temperature level:%d...\r\n",temperature_level);
-            rc = set_temperature_level(&communication_task_contex,temperature_level);
+            temperature_setting = adu[ADU_DATA_REGION_OFFSET + DATA_REGION_TEMPERATURE_OFFSET];
+            log_debug("set temperature :%d...\r\n",temperature_setting);
+            rc = set_temperature_level(&communication_task_contex,temperature_setting);
             if (rc == 0) {
                 rsp[rsp_offset ++] = DATA_RESULT_SET_TEMPERATURE_SUCCESS;     
             } else {

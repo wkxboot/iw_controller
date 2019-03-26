@@ -363,6 +363,7 @@
                     <state>$PROJ_DIR$/../../board/user/rtos</state>
                     <state>$PROJ_DIR$/../../board/user/circle_buffer</state>
                     <state>$PROJ_DIR$/../../board/user/utils</state>
+                    <state>$PROJ_DIR$/../../board/user/nv_flash</state>
                 </option>
                 <option>
                     <name>CCStdIncCheck</name>
@@ -2120,6 +2121,12 @@
                         <name>$PROJ_DIR$\..\user\debug\log\log.c</name>
                     </file>
                 </group>
+            </group>
+            <group>
+                <name>nv_flash</name>
+                <file>
+                    <name>$PROJ_DIR$\..\user\nv_flash\nv_flash.c</name>
+                </file>
             </group>
             <group>
                 <name>rtos</name>

@@ -2,6 +2,7 @@
 #include "tasks_init.h"
 #include "board.h"
 #include "compressor_task.h"
+#include "nv_flash.h"
 #include "log.h"
 
 /*任务句柄*/
@@ -54,6 +55,9 @@ static compressor_t compressor ={
 .temperature_level[3] = {19,23},
 .temperature_err = false
 };
+
+
+
 
 static void compressor_timer_init(void);
 
@@ -141,12 +145,6 @@ static void compressor_pwr_turn_off()
     bsp_compressor_ctrl_pwr_off();  
 }
 
-
-static int nv_flash_save(uint8_t *value,uint8_t cnt)
-{
-
-    return 0;
-}
 /*
 * @brief 压缩机任务
 * @param argument 任务参数
@@ -160,6 +158,23 @@ void compressor_task(void const *argument)
     osStatus status;
     uint8_t level;
     compressor_task_message_t req_msg,req_update_msg,rsp_setting_msg;
+    
+    rc = nv_flash_region_int();
+    log_assert(rc == 0);
+
+    rc = nv_flash_read_user_data(0,&level,1);
+    if (rc <= 0) {
+        log_warning("level not exsit in flash.default:%d.\r\n",COMPRESSOR_TASK_TEMPERATURE_LEVEL_DEFAULT);
+        compressor.level = COMPRESSOR_TASK_TEMPERATURE_LEVEL_DEFAULT;
+    } else {
+        if (level < COMPRESSOR_TASK_TEMPERATURE_LEVEL_CNT) {
+            log_warning("level:%d exsit in flash.valid.\r\n",level);
+            compressor.level = level;
+        } else {
+            log_error("level:%d read from flash invalid.default:%d.\r\n",level,COMPRESSOR_TASK_TEMPERATURE_LEVEL_DEFAULT);
+            compressor.level = COMPRESSOR_TASK_TEMPERATURE_LEVEL_DEFAULT;
+        }
+    }
 
     /*上电先关闭压缩机*/
     compressor_pwr_turn_off();
@@ -288,7 +303,7 @@ void compressor_task(void const *argument)
         /*配置压缩机工作温度区间消息*/
         if (req_msg.request.type == COMPRESSOR_TASK_MSG_TYPE_SET_TEMPERATURE_LEVEL){      
             if (req_msg.request.temperature_setting < COMPRESSOR_TASK_TEMPERATURE_SETTING_MIN ||\
-                rsp_setting_msg.request.temperature_setting > COMPRESSOR_TASK_TEMPERATURE_SETTING_MAX) {
+                req_msg.request.temperature_setting > COMPRESSOR_TASK_TEMPERATURE_SETTING_MAX) {
                 rsp_setting_msg.response.result = COMPRESSOR_TASK_FAIL;
                 log_error("温度设置值:%.2f C无效.min:%.2f C max:%.2f C.\r\n.",
                             rsp_setting_msg.request.temperature_setting,
@@ -308,7 +323,7 @@ void compressor_task(void const *argument)
                 rsp_setting_msg.response.result = COMPRESSOR_TASK_SUCCESS;
                 if (compressor.level != level) {
                     compressor.level = level;
-                    rc = nv_flash_save(&level,1);
+                    rc = nv_flash_save_user_data(0,&level,1);
                     if (rc != 0) {
                         rsp_setting_msg.response.result = COMPRESSOR_TASK_FAIL;
                         log_error("nv flash save temperature level fail.\r\n");
