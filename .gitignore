@@ -2,5 +2,5 @@
 !/iw_controller/board/iar/iw_controller.eww
 !/iw_controller/board/iar/iw_controller.ewd
 !/iw_controller/board/iar/iw_controller.ewp
-!/iw_controller/board/iar/LPC5460xJ512.icf
+!/iw_controller/board/iar/iw_controller.icf
 !/iw_controller/board/iar/startup_LPC54606.s

@@ -159,29 +159,36 @@ void compressor_task(void const *argument)
     uint8_t level;
     compressor_task_message_t req_msg,req_update_msg,rsp_setting_msg;
     
-    rc = nv_flash_region_int();
-    log_assert(rc == 0);
-
-    rc = nv_flash_read_user_data(0,&level,1);
-    if (rc <= 0) {
-        log_warning("level not exsit in flash.default:%d.\r\n",COMPRESSOR_TASK_TEMPERATURE_LEVEL_DEFAULT);
-        compressor.level = COMPRESSOR_TASK_TEMPERATURE_LEVEL_DEFAULT;
-    } else {
-        if (level < COMPRESSOR_TASK_TEMPERATURE_LEVEL_CNT) {
-            log_warning("level:%d exsit in flash.valid.\r\n",level);
-            compressor.level = level;
-        } else {
-            log_error("level:%d read from flash invalid.default:%d.\r\n",level,COMPRESSOR_TASK_TEMPERATURE_LEVEL_DEFAULT);
-            compressor.level = COMPRESSOR_TASK_TEMPERATURE_LEVEL_DEFAULT;
-        }
-    }
-
     /*上电先关闭压缩机*/
     compressor_pwr_turn_off();
     /*定时器初始化*/
     compressor_timer_init();
     /*消除编译警告*/
     compressor_timer_stop();
+    /*nv flash初始化*/
+    rc = nv_flash_region_int();
+    log_assert(rc == 0);
+    /*读取温度配置*/
+    rc = nv_flash_read_user_data(0,&level,1);
+    if (rc <= 0) {
+        log_info("level not exsit in flash.default:%d.\r\n",COMPRESSOR_TASK_TEMPERATURE_LEVEL_DEFAULT);
+        compressor.level = COMPRESSOR_TASK_TEMPERATURE_LEVEL_DEFAULT;
+    } else {
+        if (level < COMPRESSOR_TASK_TEMPERATURE_LEVEL_CNT) {
+            log_info("level:%d exsit in flash.valid.\r\n",level);
+            compressor.level = level;
+        } else {
+            log_error("level:%d read from flash invalid.default:%d.\r\n",level,COMPRESSOR_TASK_TEMPERATURE_LEVEL_DEFAULT);
+            compressor.level = COMPRESSOR_TASK_TEMPERATURE_LEVEL_DEFAULT;
+        }
+    }
+    /*复制温度参数*/
+    compressor.temperature_work = compressor.temperature_level[compressor.level].work;
+    compressor.temperature_stop = compressor.temperature_level[compressor.level].stop;
+    log_info("压缩机工作温度范围:%.2fC~%.2fC.\r\n",compressor.temperature_stop,compressor.temperature_work);
+
+
+
     /*上电等待*/
     compressor_timer_start(COMPRESSOR_TASK_PWR_ON_WAIT_TIMEOUT);
   
@@ -262,7 +269,9 @@ void compressor_task(void const *argument)
                 /*同样打开等待定时器*/ 
                 compressor_timer_start(COMPRESSOR_TASK_WAIT_TIMEOUT);  
                 log_info("温度错误.关压缩机.等待%d分钟.\r\n",COMPRESSOR_TASK_WAIT_TIMEOUT / (60 * 1000));
-            } 
+            } else {
+                log_info("温度错误.压缩机已经停机状态:%d.跳过.\r\n",compressor.status);
+            }
         }
  
         /*压缩机根据温度更新工作状态*/
@@ -326,9 +335,9 @@ void compressor_task(void const *argument)
                     rc = nv_flash_save_user_data(0,&level,1);
                     if (rc != 0) {
                         rsp_setting_msg.response.result = COMPRESSOR_TASK_FAIL;
-                        log_error("nv flash save temperature level fail.\r\n");
+                        log_error("nv flash save temperature fail.\r\n");
                     } else {                                
-                        log_debug("温度设置值:%.2f 成功.区间 %.2f C---%.2f C.\r\n",level,compressor.temperature_level[level].stop,compressor.temperature_level[level].work);
+                        log_debug("温度设置值:%dC成功.区间%.2fC~%.2fC.\r\n",req_msg.request.temperature_setting,compressor.temperature_level[level].stop,compressor.temperature_level[level].work);
                         /*发送消息更新压缩机工作状态*/
                         req_update_msg.request.type = COMPRESSOR_TASK_MSG_TYPE_UPDATE_STATUS;
                         status = osMessagePut(compressor_task_msg_q_id,(uint32_t)&req_update_msg,COMPRESSOR_TASK_PUT_MSG_TIMEOUT);

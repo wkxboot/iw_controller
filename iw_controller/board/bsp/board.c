@@ -210,7 +210,7 @@ int bsp_board_init(void)
 
     BOARD_InitBootPins();
     BOARD_BootClockPLL180M();
-
+    //BOARD_BootClockFROHF96M();
     return 0;
 }
 

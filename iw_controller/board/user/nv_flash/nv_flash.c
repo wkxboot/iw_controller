@@ -130,6 +130,49 @@ static int nv_flash_erase_region(nv_flash_region_t region)
     return 0;
 }
 
+/*
+* @brief nv_flash_program_region 编程
+* @param region 存储区域类型
+* @param dst_addr 编程地址
+* @param src 数据源
+* @param cnt 数量
+* @return 0：成功 -1：失败
+* @note
+*/
+static int nv_flash_program_region(nv_flash_region_t region,uint32_t dst_addr,uint8_t *src,uint32_t cnt)
+{
+    status_t status;
+    uint32_t sector_num,sector_cnt;
+    
+    if (region == NV_FLASH_REGION_BANK1) {
+        sector_num = NV_FLASH_USER_DATA_SECTOR_BANK1_OFFSET;
+        sector_cnt = NV_FLASH_USER_DATA_SECTOR_BANK1_CNT;
+        log_debug("program bank1...\r\n");
+    } else {
+        sector_num = NV_FLASH_USER_DATA_SECTOR_BANK2_OFFSET;
+        sector_cnt = NV_FLASH_USER_DATA_SECTOR_BANK2_CNT;
+        log_debug("program bank2...\r\n");
+    }
+    /*保存块到bank1*/
+    NV_FLASH_ENTER_CRITICAL();
+    status = FLASHIAP_PrepareSectorForWrite(sector_num,sector_num + sector_cnt - 1);
+    NV_FLASH_EXIT_CRITICAL();
+    if (status != kStatus_Success) {
+        log_error("prepare bank status:%d err.\r\n",status);
+        return -1;
+    }
+    log_debug("program addr:%d cnt:%d...\r\n",dst_addr,cnt);
+    NV_FLASH_ENTER_CRITICAL();
+    status = FLASHIAP_CopyRamToFlash(dst_addr,(uint32_t*)src,cnt,SystemCoreClock);
+    NV_FLASH_EXIT_CRITICAL();
+    if (status != kStatus_Success) {
+        log_error("program status:%d err.\r\n",status);
+        return -1;
+    }
+    log_debug("program ok.\r\n");
+    return 0;
+}
+
    
 /*
 * @brief nv flash 数据读取
@@ -169,10 +212,9 @@ int nv_flash_save_user_data(uint32_t offset,uint8_t *src,uint32_t cnt)
 {
     int rc;
     uint32_t write_size = 0;
-    status_t status;
     nv_flash_block_t *addr_current,*addr_free;
   
-    /*查找bank1上的block块*/
+    /*查找bank1上的可用block块*/
     addr_free = nv_flash_search_free_block(NV_FLASH_REGION_BANK1);
     /*如果bank1已经存满,就擦除bank1,重新写入*/
     if (addr_free == NULL) {      
@@ -181,7 +223,7 @@ int nv_flash_save_user_data(uint32_t offset,uint8_t *src,uint32_t cnt)
             log_error("erase bank1 err.\r\n");
             return -1;
         }
-        /*查找bank1空闲块*/
+        /*再次查找bank1空闲块*/
         addr_free = nv_flash_search_free_block(NV_FLASH_REGION_BANK1);   
         if (addr_free == NULL) {
             /*如果还是没有block bug*/
@@ -198,7 +240,7 @@ int nv_flash_save_user_data(uint32_t offset,uint8_t *src,uint32_t cnt)
         current = *addr_current; 
         current.id ++;
     } else {
-        current.id = 1;
+        current.id = 1;/*重新计数*/
     }
     /*更新数据*/
     while (write_size < cnt && write_size + offset < NV_FLASH_USER_DATA_SIZE) {
@@ -207,19 +249,10 @@ int nv_flash_save_user_data(uint32_t offset,uint8_t *src,uint32_t cnt)
     }
     current.status = REGION_STATUS_VALID;
     /*保存块到bank1*/
-    status = FLASHIAP_PrepareSectorForWrite(NV_FLASH_USER_DATA_SECTOR_BANK1_OFFSET, NV_FLASH_USER_DATA_SECTOR_BANK1_OFFSET + NV_FLASH_USER_DATA_SECTOR_BANK1_CNT - 1);
-    if (status != kStatus_Success) {
-        log_error("prepare bank1 status:%d err.\r\n",status);
+    rc = nv_flash_program_region(NV_FLASH_REGION_BANK1,(uint32_t)addr_free,(uint8_t*)&current,sizeof(nv_flash_block_t));
+    if (rc != 0) {
         return -1;
     }
-    log_debug("start program bank1 addr:%d cnt:%d...\r\n",addr_free,sizeof(nv_flash_block_t));
-    status = FLASHIAP_CopyRamToFlash((uint32_t)addr_free,(uint32_t*)&current,sizeof(nv_flash_block_t),SystemCoreClock);
-    if (status != kStatus_Success) {
-        log_error("program bank1 status:%d err.\r\n",status);
-        return -1;
-    }
-    log_debug("program bank1 ok.\r\n");
-
     /*在bank2查找空闲块*/
     addr_free = nv_flash_search_free_block(NV_FLASH_REGION_BANK2);
     /*如果bank2满了就擦除,重新写入*/
@@ -238,18 +271,10 @@ int nv_flash_save_user_data(uint32_t offset,uint8_t *src,uint32_t cnt)
         }  
     }
     /*保存块到bank2*/
-    status = FLASHIAP_PrepareSectorForWrite(NV_FLASH_USER_DATA_SECTOR_BANK2_OFFSET, NV_FLASH_USER_DATA_SECTOR_BANK2_OFFSET + NV_FLASH_USER_DATA_SECTOR_BANK2_CNT - 1);
-    if (status != kStatus_Success) {
-        log_error("prepare bank2 status:%d err.\r\n",status);
+    rc = nv_flash_program_region(NV_FLASH_REGION_BANK2,(uint32_t)addr_free,(uint8_t*)&current,sizeof(nv_flash_block_t));
+    if (rc != 0) {
         return -1;
     }
-    log_debug("start program bank2 addr:%d cnt:%d.\r\n",addr_free,sizeof(nv_flash_block_t));
-    status = FLASHIAP_CopyRamToFlash((uint32_t)addr_free,(uint32_t*)&current,sizeof(nv_flash_block_t),SystemCoreClock);
-    if (status != kStatus_Success) {
-        log_error("program bank2 status:%d err.\r\n",status);
-        return -1;
-    }
-    log_debug("program bank2 ok.\r\n");
 
     return 0;
 }
@@ -263,7 +288,6 @@ int nv_flash_save_user_data(uint32_t offset,uint8_t *src,uint32_t cnt)
 int nv_flash_region_int(void)
 {
     int rc;
-    status_t status;
     nv_flash_block_t *sync_addr,*addr_bank1,*addr_bank2;
     nv_flash_region_t sync_region;
 
@@ -316,19 +340,8 @@ int nv_flash_region_int(void)
         }
     }
     /*保存块*/
-    if (sync_region == NV_FLASH_REGION_BANK1) {
-        status = FLASHIAP_PrepareSectorForWrite(NV_FLASH_USER_DATA_SECTOR_BANK1_OFFSET,NV_FLASH_USER_DATA_SECTOR_BANK1_OFFSET + NV_FLASH_USER_DATA_SECTOR_BANK1_CNT - 1);
-    } else {
-        status = FLASHIAP_PrepareSectorForWrite(NV_FLASH_USER_DATA_SECTOR_BANK2_OFFSET,NV_FLASH_USER_DATA_SECTOR_BANK2_OFFSET + NV_FLASH_USER_DATA_SECTOR_BANK2_CNT - 1);
-    }
-    if (status != kStatus_Success) {
-        log_error("prepare bank status:%d err.\r\n",status);
-        return -1;
-    }
-    log_debug("start program bank addr:%d cnt:%d.\r\n",sync_addr,sizeof(nv_flash_block_t));
-    status = FLASHIAP_CopyRamToFlash((uint32_t)sync_addr,(uint32_t*)&current,sizeof(nv_flash_block_t),SystemCoreClock);
-    if (status != kStatus_Success) {
-        log_error("program bank status:%d err.\r\n",status);
+    rc = nv_flash_program_region(sync_region,(uint32_t)sync_addr,(uint8_t*)&current,sizeof(nv_flash_block_t));
+    if (rc != 0) {
         return -1;
     }
     log_debug("sync block ok.\r\n");

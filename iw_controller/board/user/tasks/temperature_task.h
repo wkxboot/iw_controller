@@ -37,7 +37,7 @@ void temperature_task(void const *argument);
 #define  TEMPERATURE_ALARM_VALUE_MIN               -19  /*软件温度低值异常下限 <*/
 #define  TEMPERATURE_ERR_VALUE                     127.0/*错误温度值*/
 #define  TEMPERATURE_ACCURATE                      0.1  /*温度精度*/ 
-#define  TEMPERATURE_ERR_CNT                       10   /*温度错误确认次数*/ 
+#define  TEMPERATURE_ERR_CNT                       3    /*温度错误确认次数*/ 
 
 
 #define  ADC_ERR_MAX                               4090

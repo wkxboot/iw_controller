@@ -161,7 +161,7 @@ int nxp_serial_uart_hal_init(uint8_t port,uint32_t baud_rates,uint8_t data_bits,
     }else{
     config.bitCountPerChar = kUSART_7BitsPerChar;
     }
-    if(stop_bits ==1){
+    if(stop_bits == 1){
     config.stopBitCount = kUSART_OneStopBit;
     }else{
     config.stopBitCount = kUSART_TwoStopBit;
@@ -275,17 +275,17 @@ void nxp_serial_uart_hal_isr(int handle)
     nxp_uart_handle = nxp_serial_uart_search_handle_by_port(((serial_t *)handle)->port);
 
     tmp_flag = USART_GetEnabledInterrupts(nxp_uart_handle);
-    tmp_it_source =USART_GetStatusFlags(nxp_uart_handle);
+    tmp_it_source = USART_GetStatusFlags(nxp_uart_handle);
   
     /*接收中断处理*/
     if((tmp_it_source & kUSART_RxFifoNotEmptyFlag) && (tmp_flag & kUSART_RxLevelInterruptEnable)){
-        recv_byte=USART_ReadByte(nxp_uart_handle);
+        recv_byte = USART_ReadByte(nxp_uart_handle);
         isr_serial_put_byte_from_recv(handle,recv_byte);
 
     }
     /*发送中断处理*/
     if((tmp_it_source & kUSART_TxFifoEmptyFlag) && (tmp_flag & kUSART_TxLevelInterruptEnable)){
-        result =isr_serial_get_byte_to_send(handle,&send_byte);
+        result = isr_serial_get_byte_to_send(handle,&send_byte);
         if (result == 1) {
             USART_WriteByte(nxp_uart_handle, send_byte);
         }

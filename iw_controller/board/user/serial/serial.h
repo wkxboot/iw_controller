@@ -20,8 +20,8 @@
 
 SERIAL_BEGIN
 
-#define  SERIAL_PRIORITY_BITS                       4
-#define  SERIAL_PRIORITY_HIGH                       5
+#define  SERIAL_PRIORITY_BITS                       3
+#define  SERIAL_PRIORITY_HIGH                       2
 #define  SERIAL_MAX_INTERRUPT_PRIORITY             (SERIAL_PRIORITY_HIGH << (8 - SERIAL_PRIORITY_BITS))
 
 

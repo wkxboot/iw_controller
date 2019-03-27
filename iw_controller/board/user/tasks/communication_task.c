@@ -81,7 +81,7 @@ static communication_task_contex_t communication_task_contex;
 #define  DATA_RESULT_CALIBRATION_FAIL               0x00
 #define  DATA_RESULT_SET_TEMPERATURE_SUCCESS        0x01
 #define  DATA_RESULT_SET_TEMPERATURE_FAIL           0x00
-#define  DATA_MANUFACTURER_CHANGHONG_ID             0x1101
+#define  DATA_MANUFACTURER_CHANGHONG_ID             0x1100
 /*CRC16域*/
 #define  ADU_CRC_SIZE                               2
 
@@ -1390,6 +1390,8 @@ static void communication_task_contex_init(communication_task_contex_t *contex)
     osMessageQDef(calibration_full_rsp_msg_q,SCALE_CNT_MAX,uint32_t);
     contex->calibration_full_rsp_msg_q_id = osMessageCreate(osMessageQ(calibration_full_rsp_msg_q),0);
     log_assert(contex->calibration_full_rsp_msg_q_id);
+    /*厂商ID*/
+    contex->manufacturer_id = DATA_MANUFACTURER_CHANGHONG_ID;
 
     contex->initialized = true;
 }

@@ -13,8 +13,8 @@
 #endif
 
 
-#define  CIRCLE_BUFFER_PRIORITY_BITS                   4
-#define  CIRCLE_BUFFER_PRIORITY_HIGH                   5  
+#define  CIRCLE_BUFFER_PRIORITY_BITS                   3
+#define  CIRCLE_BUFFER_PRIORITY_HIGH                   2  
 
 #define  CIRCLE_BUFFER_MAX_INTERRUPT_PRIORITY          (CIRCLE_BUFFER_PRIORITY_HIGH << (8 - CIRCLE_BUFFER_PRIORITY_BITS))
 typedef struct
