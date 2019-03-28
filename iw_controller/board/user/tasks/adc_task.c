@@ -32,13 +32,17 @@ adc_result_info_t *volatile gAdcResultInfoPtr = &gAdcResultInfoStruct;
 */
 void  ADC0_SEQA_IRQHandler()
 {
-    if (kADC_ConvSeqAInterruptFlag & ADC_GetStatusFlags(TEMPERATURE_ADC)) {
+    if (kADC_ConvSeqAInterruptFlag == (kADC_ConvSeqAInterruptFlag & ADC_GetStatusFlags(TEMPERATURE_ADC))) {
         ADC_GetChannelConversionResult(TEMPERATURE_ADC, TEMPERATURE_ADC_CHANNEL, gAdcResultInfoPtr);
         adc_sample[ADC_TASK_TEMPERATURE_IDX] = gAdcResultInfoPtr->result;
         ADC_ClearStatusFlags(TEMPERATURE_ADC, kADC_ConvSeqAInterruptFlag);
         osSignalSet(adc_task_hdl,ADC_TASK_ADC_COMPLETED_SIGNAL);   
     }
- 
+/* Add for ARM errata 838869, affects Cortex-M4, Cortex-M4F Store immediate overlapping
+   exception return operation might vector to incorrect interrupt */
+#if defined __CORTEX_M && (__CORTEX_M == 4U)
+    __DSB();
+#endif 
 }
 /*
 * @brief adc模块时钟电源配置
@@ -54,7 +58,7 @@ static int adc_clk_pwr_config(void)
     POWER_DisablePD(kPDRUNCFG_PD_ADC0);    /* Power on the ADC converter. */
     POWER_DisablePD(kPDRUNCFG_PD_VD2_ANA); /* Power on the analog power supply. */
     POWER_DisablePD(kPDRUNCFG_PD_VREFP);   /* Power on the reference voltage source. */
-
+    POWER_DisablePD(kPDRUNCFG_PD_TS);      /* Power on the temperature sensor. */
     /* Enable the clock. */
     CLOCK_AttachClk(TEMPERATURE_ADC_CLK_SRC);
     CLOCK_EnableClock(kCLOCK_Adc0); 
@@ -72,12 +76,32 @@ static int adc_converter_init(void)
     adc_config_t adcConfigStruct;
     adc_conv_seq_config_t adcConvSeqConfigStruct;
 
-    /* Configure the converter. */
+/* Configure the converter. */
+#if defined(FSL_FEATURE_ADC_HAS_CTRL_ASYNMODE) & FSL_FEATURE_ADC_HAS_CTRL_ASYNMODE
     adcConfigStruct.clockMode = kADC_ClockSynchronousMode; /* Using sync clock source. */
-    adcConfigStruct.clockDividerNumber = 20;               /* The divider for sync clock is 2. */
+#endif                                                     /* FSL_FEATURE_ADC_HAS_CTRL_ASYNMODE */
+    adcConfigStruct.clockDividerNumber = 4;
+#if defined(FSL_FEATURE_ADC_HAS_CTRL_RESOL) & FSL_FEATURE_ADC_HAS_CTRL_RESOL
     adcConfigStruct.resolution = kADC_Resolution12bit;
+#endif /* FSL_FEATURE_ADC_HAS_CTRL_RESOL */
+#if defined(FSL_FEATURE_ADC_HAS_CTRL_BYPASSCAL) & FSL_FEATURE_ADC_HAS_CTRL_BYPASSCAL
     adcConfigStruct.enableBypassCalibration = false;
-    adcConfigStruct.sampleTimeNumber = 200U;
+#endif /* FSL_FEATURE_ADC_HAS_CTRL_BYPASSCAL */
+#if defined(FSL_FEATURE_ADC_HAS_CTRL_TSAMP) & FSL_FEATURE_ADC_HAS_CTRL_TSAMP
+    adcConfigStruct.sampleTimeNumber = 4U;
+#endif /* FSL_FEATURE_ADC_HAS_CTRL_TSAMP */
+#if defined(FSL_FEATURE_ADC_HAS_CTRL_LPWRMODE) & FSL_FEATURE_ADC_HAS_CTRL_LPWRMODE
+    adcConfigStruct.enableLowPowerMode = false;
+#endif /* FSL_FEATURE_ADC_HAS_CTRL_LPWRMODE */
+#if defined(FSL_FEATURE_ADC_HAS_TRIM_REG) & FSL_FEATURE_ADC_HAS_TRIM_REG
+    adcConfigStruct.voltageRange = kADC_HighVoltageRange;
+#endif /* FSL_FEATURE_ADC_HAS_TRIM_REG */
+    ADC_Init(TEMPERATURE_ADC, &adcConfigStruct);
+
+#if !(defined(FSL_FEATURE_ADC_HAS_NO_INSEL) && FSL_FEATURE_ADC_HAS_NO_INSEL)
+    /* Use the temperature sensor input to channel 0. */
+    ADC_EnableTemperatureSensor(TEMPERATURE_ADC, true);
+#endif /* FSL_FEATURE_ADC_HAS_NO_INSEL. */
 
     ADC_Init(TEMPERATURE_ADC, &adcConfigStruct);
 

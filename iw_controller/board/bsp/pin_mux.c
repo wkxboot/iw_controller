@@ -56,8 +56,8 @@ BOARD_InitPins:
   - {pin_num: '5', peripheral: FLEXCOMM8, signal: TXD_SCL_MISO, pin_signal: PIO1_18/FC8_TXD_SCL_MISO/SCT0_OUT5/CAN1_RD/EMC_BLSN(1)}
   - {pin_num: '24', peripheral: SWD, signal: SWCLK, pin_signal: PIO0_11/FC6_RXD_SDA_MOSI_DATA/CTIMER2_MAT2/FREQME_GPIO_CLK_A/SWCLK/ADC0_1}
   - {pin_num: '25', peripheral: SWD, signal: SWDIO, pin_signal: PIO0_12/FC3_TXD_SCL_MISO/FREQME_GPIO_CLK_B/SCT0_GPI7/SWDIO/ADC0_2}
-  - {pin_num: '26', peripheral: ADC0, signal: 'CH, 3', pin_signal: PIO0_15/FC6_CTS_SDA_SSEL0/UTICK_CAP2/CTIMER4_CAP0/SCT0_OUT2/EMC_WEN/ENET_TX_EN/ADC0_3}
-  - {pin_num: '28', peripheral: ADC0, signal: 'CH, 5', pin_signal: PIO0_31/FC0_CTS_SDA_SSEL0/SD_D(2)/CTIMER0_MAT1/SCT0_OUT3/TRACEDATA(0)/ADC0_5}
+  - {pin_num: '26', peripheral: ADC0, signal: 'CH, 3', pin_signal: PIO0_15/FC6_CTS_SDA_SSEL0/UTICK_CAP2/CTIMER4_CAP0/SCT0_OUT2/EMC_WEN/ENET_TX_EN/ADC0_3, mode: pullDown}
+  - {pin_num: '28', peripheral: ADC0, signal: 'CH, 5', pin_signal: PIO0_31/FC0_CTS_SDA_SSEL0/SD_D(2)/CTIMER0_MAT1/SCT0_OUT3/TRACEDATA(0)/ADC0_5, mode: pullDown}
  * BE CAREFUL MODIFYING THIS COMMENT - IT IS YAML SETTINGS FOR TOOLS ***********
  */
 /* clang-format on */
@@ -112,11 +112,16 @@ void BOARD_InitPins(void)
 
     IOCON->PIO[0][15] = ((IOCON->PIO[0][15] &
                           /* Mask bits to zero which are setting */
-                          (~(IOCON_PIO_FUNC_MASK | IOCON_PIO_DIGIMODE_MASK)))
+                          (~(IOCON_PIO_FUNC_MASK | IOCON_PIO_MODE_MASK | IOCON_PIO_DIGIMODE_MASK)))
 
                          /* Selects pin function.
                           * : PORT015 (pin 26) is configured as ADC0_3. */
                          | IOCON_PIO_FUNC(PIO015_FUNC_ALT0)
+
+                         /* Selects function mode (on-chip pull-up/pull-down resistor control).
+                          * : Pull-down.
+                          * Pull-down resistor enabled. */
+                         | IOCON_PIO_MODE(PIO015_MODE_PULL_DOWN)
 
                          /* Select Analog/Digital mode.
                           * : Analog mode. */
@@ -172,11 +177,16 @@ void BOARD_InitPins(void)
 
     IOCON->PIO[0][31] = ((IOCON->PIO[0][31] &
                           /* Mask bits to zero which are setting */
-                          (~(IOCON_PIO_FUNC_MASK | IOCON_PIO_DIGIMODE_MASK)))
+                          (~(IOCON_PIO_FUNC_MASK | IOCON_PIO_MODE_MASK | IOCON_PIO_DIGIMODE_MASK)))
 
                          /* Selects pin function.
                           * : PORT031 (pin 28) is configured as ADC0_5. */
                          | IOCON_PIO_FUNC(PIO031_FUNC_ALT0)
+
+                         /* Selects function mode (on-chip pull-up/pull-down resistor control).
+                          * : Pull-down.
+                          * Pull-down resistor enabled. */
+                         | IOCON_PIO_MODE(PIO031_MODE_PULL_DOWN)
 
                          /* Select Analog/Digital mode.
                           * : Analog mode. */

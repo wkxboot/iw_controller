@@ -194,8 +194,13 @@ void temperature_task(void const *argument)
                     }
                 } else {  
                     t_int = calculate_approximate_t(t_float);
-                    temperature.err = false;
-                    temperature.err_cnt = 0;
+                    /*温度由错误变为正常，需要发送温度变化消息*/
+                    if ( temperature.err == true) {
+                        temperature.err = false;
+                        temperature.err_cnt = 0;
+                        temperature.change = true;
+                    }
+                    /*温度精度*/
                     if (t_float - temperature.value_float >= TEMPERATURE_ACCURATE) {
                         temperature.dir += 1;    
                     }else if(t_float - temperature.value_float <= -TEMPERATURE_ACCURATE) {
@@ -203,7 +208,7 @@ void temperature_task(void const *argument)
                     } else {
                         temperature.dir = 0; 
                     }
-                    /*当满足条件时 接受数据变化*/
+                    /*温度正常变化 当满足条件时 接受数据变化*/
                     if (temperature.dir >= TEMPERATURE_TASK_TEMPERATURE_CHANGE_CNT ||
                         temperature.dir <= -TEMPERATURE_TASK_TEMPERATURE_CHANGE_CNT){
                         temperature.value_int = t_int;
