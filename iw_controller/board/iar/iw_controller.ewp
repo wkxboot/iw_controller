@@ -830,7 +830,7 @@
                 </option>
                 <option>
                     <name>IlinkAdditionalLibs</name>
-                    <state>$PROJ_DIR$/../../device/LPC54606/power_lib/iar_lib_power.a</state>
+                    <state>$PROJ_DIR$/../../device/LPC54606/iar/iar_lib_power.a</state>
                 </option>
                 <option>
                     <name>IlinkOverrideProgramEntryLabel</name>
@@ -2252,9 +2252,6 @@
                 <name>$PROJ_DIR$\..\..\device\LPC54606\drivers\fsl_i2c_dma.c</name>
             </file>
             <file>
-                <name>$PROJ_DIR$\..\..\device\LPC54606\drivers\fsl_i2c_freertos.c</name>
-            </file>
-            <file>
                 <name>$PROJ_DIR$\..\..\device\LPC54606\drivers\fsl_i2s.c</name>
             </file>
             <file>
@@ -2297,9 +2294,6 @@
                 <name>$PROJ_DIR$\..\..\device\LPC54606\drivers\fsl_spi_dma.c</name>
             </file>
             <file>
-                <name>$PROJ_DIR$\..\..\device\LPC54606\drivers\fsl_spi_freertos.c</name>
-            </file>
-            <file>
                 <name>$PROJ_DIR$\..\..\device\LPC54606\drivers\fsl_spifi.c</name>
             </file>
             <file>
@@ -2310,9 +2304,6 @@
             </file>
             <file>
                 <name>$PROJ_DIR$\..\..\device\LPC54606\drivers\fsl_usart_dma.c</name>
-            </file>
-            <file>
-                <name>$PROJ_DIR$\..\..\device\LPC54606\drivers\fsl_usart_freertos.c</name>
             </file>
             <file>
                 <name>$PROJ_DIR$\..\..\device\LPC54606\drivers\fsl_utick.c</name>
