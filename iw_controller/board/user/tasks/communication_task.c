@@ -81,7 +81,7 @@ static communication_task_contex_t communication_task_contex;
 #define  DATA_RESULT_CALIBRATION_FAIL               0x00
 #define  DATA_RESULT_SET_TEMPERATURE_SUCCESS        0x01
 #define  DATA_RESULT_SET_TEMPERATURE_FAIL           0x00
-#define  DATA_MANUFACTURER_CHANGHONG_ID             0x1100
+#define  DATA_MANUFACTURER_CHANGHONG_ID             0x1101
 /*CRC16域*/
 #define  ADU_CRC_SIZE                               2
 
@@ -207,10 +207,10 @@ static uint8_t adu_add_crc16(uint8_t *adu,uint8_t size)
 static int communication_read_scale_addr_configration(scale_addr_configration_t *addr)
 {
     addr->cnt = 4;
-    addr->value[0] = 11;
-    addr->value[1] = 21;
-    addr->value[2] = 31;
-    addr->value[3] = 41;
+    addr->value[0] = 1;
+    addr->value[1] = 2;
+    addr->value[2] = 3;
+    addr->value[3] = 4;
     
     return 0;
 }
@@ -1147,28 +1147,28 @@ static int get_serial_port_by_addr(uint8_t addr)
 {
     int port = -1;
     switch (addr) {
-    case 11:
+    case 1:
         port = 1;
         break;
-    case 12:
-        port = 2;
-        break;
-    case 21:
+    case 2:
         port = 3;
         break;
-    case 22:
-        port = 4;
-        break;
-    case 31:
+    case 3:
         port = 5;
         break;
-    case 32:
-        port = 6;
-        break;
-    case 41:
+    case 4:
         port = 7;
         break;
-    case 42:
+    case 5:
+        port = 2;
+        break;
+    case 6:
+        port = 4;
+        break;
+    case 7:
+        port = 6;
+        break;
+    case 8:
         port = 8;
         break;
     default :

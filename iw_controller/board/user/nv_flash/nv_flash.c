@@ -115,13 +115,16 @@ static int nv_flash_erase_region(nv_flash_region_t region)
         log_debug("erase bank2...\r\n");
     }
     /*保存块到bank*/
+    NV_FLASH_ENTER_CRITICAL();
     status = FLASHIAP_PrepareSectorForWrite(sector_num,sector_num + sector_cnt - 1);
+    NV_FLASH_EXIT_CRITICAL();
     if (status != kStatus_Success) {
         log_error("prepare bank status:%d err.\r\n",status);
         return -1;
     }
-
+    NV_FLASH_ENTER_CRITICAL();
     status = FLASHIAP_EraseSector(sector_num,sector_num + sector_cnt - 1, SystemCoreClock);
+    NV_FLASH_EXIT_CRITICAL();
     if (status != kStatus_Success) {
         log_error("erase fail.\r\n");
         return -1;
@@ -173,7 +176,35 @@ static int nv_flash_program_region(nv_flash_region_t region,uint32_t dst_addr,ui
     return 0;
 }
 
-   
+
+/*
+* @brief nv_flash_is_blank_region 判断是否为空白区域
+* @param region 区域类型
+* @return 0 成功 -1 失败
+* @note
+*/
+static bool nv_flash_is_blank_region(nv_flash_region_t region)
+{
+    status_t status;
+    uint32_t sector_num,sector_cnt;
+    
+    if (region == NV_FLASH_REGION_BANK1) {
+        sector_num = NV_FLASH_USER_DATA_SECTOR_BANK1_OFFSET;
+        sector_cnt = NV_FLASH_USER_DATA_SECTOR_BANK1_CNT;
+    } else {
+        sector_num = NV_FLASH_USER_DATA_SECTOR_BANK2_OFFSET;
+        sector_cnt = NV_FLASH_USER_DATA_SECTOR_BANK2_CNT;
+    }
+    NV_FLASH_ENTER_CRITICAL();
+    status = FLASHIAP_BlankCheckSector(sector_num,sector_num + sector_cnt - 1);
+    NV_FLASH_EXIT_CRITICAL();
+    if (status == kStatus_Success) {
+        return true;
+    }
+
+    return false;
+}  
+ 
 /*
 * @brief nv flash 数据读取
 * @param offset 读取偏移地址
@@ -299,6 +330,27 @@ int nv_flash_region_int(void)
     /*如果bank1和bank2都不存在block，跳过*/
     if (addr_bank1 == NULL && addr_bank2 == NULL) {
         log_debug("nv flash check ok.no data.\r\n");
+        /*如果bank1不是空白的，就擦除*/
+        if (!nv_flash_is_blank_region(NV_FLASH_REGION_BANK1)) {
+            log_debug("bank1 is not blank.erase...\r\n");
+            rc = nv_flash_erase_region(NV_FLASH_REGION_BANK1);
+            if (rc == 0) {
+                log_debug("blank check erase ok.\r\n");
+            } else {
+                log_error("blank check erase err.\r\n");
+            }
+        }
+        /*如果bank2不是空白的，就擦除*/
+        if (!nv_flash_is_blank_region(NV_FLASH_REGION_BANK2)) {
+            log_debug("bank2 is not blank.erase...\r\n");
+            rc = nv_flash_erase_region(NV_FLASH_REGION_BANK2);
+            if (rc == 0) {
+                log_debug("blank check erase ok.\r\n");
+            } else {
+                log_error("blank check erase err.\r\n");
+            }
+        }
+
         return 0;
     } 
     /*如果都存在，就比较id*/

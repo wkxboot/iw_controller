@@ -132,13 +132,18 @@ static void lock_controller_timer_expired(void const *argument)
 
     /*手动按键状态轮询*/
     status = bsp_unlock_sw_status();
-    if (status == BSP_UNLOCK_SW_STATUS_PRESS && lock_controller.manual_switch.manual_unlock == false) {
-        lock_controller.manual_switch.manual_unlock = true;
-        /*检测到手动开门*/
-        req_msg.request.type = LOCK_TASK_MSG_TYPE_MANUAL_UNLOCK_LOCK;
-        os_status = osMessagePut(lock_task_msg_q_id,(uint32_t)&req_msg,0);
-        if (os_status != osOK) {
-            log_error("put manual unlock msg err:%d.\r\n",status);
+    if (status == BSP_UNLOCK_SW_STATUS_PRESS) {
+        if (lock_controller.manual_switch.manual_unlock == false) {
+            lock_controller.manual_switch.manual_unlock = true;
+            /*检测到手动开门*/
+            req_msg.request.type = LOCK_TASK_MSG_TYPE_MANUAL_UNLOCK_LOCK;
+            os_status = osMessagePut(lock_task_msg_q_id,(uint32_t)&req_msg,0);
+            if (os_status != osOK) {
+                log_error("put manual unlock msg err:%d.\r\n",status);
+            }
+        } else {
+            /*如果一直按着就重新计时*/
+            lock_controller.manual_switch.unlock_time = 0;
         }
     }
     if (lock_controller.manual_switch.manual_unlock == true) {
