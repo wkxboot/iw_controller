@@ -511,6 +511,7 @@ static int calibration_full(const communication_task_contex_t *contex,const uint
         }  
         req_msg[0].request.type = SCALE_TASK_MSG_TYPE_CALIBRATION_FULL_WEIGHT;    
         req_msg[0].request.rsp_message_queue_id = contex->calibration_full_rsp_msg_q_id;  
+        req_msg[0].request.weight = weight;
         req_msg[0].request.addr = addr;
         req_msg[0].request.index = 0;
         flags |= contex->scale_task_contex[rc].flag;
