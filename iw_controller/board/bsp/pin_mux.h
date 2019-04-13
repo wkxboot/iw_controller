@@ -24,6 +24,120 @@ extern "C" {
  *
  */
 void BOARD_InitBootPins(void);
+/*!
+ * @brief Select Analog/Digital mode.: Digital mode. */
+#define PIO023_DIGIMODE_DIGITAL 0x01u
+/*!
+ * @brief Selects pin function.: Alternative connection 0. */
+#define PIO023_FUNC_ALT0 0x00u
+/*!
+ * @brief Selects function mode (on-chip pull-up/pull-down resistor control).: Pull-up. Pull-up resistor enabled. */
+#define PIO023_MODE_PULL_UP 0x02u
+/*!
+ * @brief Controls open-drain mode.: Normal. Normal push-pull output */
+#define PIO023_OD_NORMAL 0x00u
+/*!
+ * @brief Select Analog/Digital mode.: Digital mode. */
+#define PIO04_DIGIMODE_DIGITAL 0x01u
+/*!
+ * @brief Selects pin function.: Alternative connection 0. */
+#define PIO04_FUNC_ALT0 0x00u
+/*!
+ * @brief Selects function mode (on-chip pull-up/pull-down resistor control).: Pull-up. Pull-up resistor enabled. */
+#define PIO04_MODE_PULL_UP 0x02u
+/*!
+ * @brief Controls open-drain mode.: Normal. Normal push-pull output */
+#define PIO04_OD_NORMAL 0x00u
+/*!
+ * @brief Select Analog/Digital mode.: Digital mode. */
+#define PIO119_DIGIMODE_DIGITAL 0x01u
+/*!
+ * @brief Selects pin function.: Alternative connection 0. */
+#define PIO119_FUNC_ALT0 0x00u
+/*!
+ * @brief Selects function mode (on-chip pull-up/pull-down resistor control).: Pull-up. Pull-up resistor enabled. */
+#define PIO119_MODE_PULL_UP 0x02u
+/*!
+ * @brief Controls open-drain mode.: Normal. Normal push-pull output */
+#define PIO119_OD_NORMAL 0x00u
+/*!
+ * @brief Select Analog/Digital mode.: Digital mode. */
+#define PIO11_DIGIMODE_DIGITAL 0x01u
+/*!
+ * @brief Selects pin function.: Alternative connection 0. */
+#define PIO11_FUNC_ALT0 0x00u
+/*!
+ * @brief Selects function mode (on-chip pull-up/pull-down resistor control).: Pull-up. Pull-up resistor enabled. */
+#define PIO11_MODE_PULL_UP 0x02u
+/*!
+ * @brief Controls open-drain mode.: Normal. Normal push-pull output */
+#define PIO11_OD_NORMAL 0x00u
+/*!
+ * @brief Select Analog/Digital mode.: Digital mode. */
+#define PIO120_DIGIMODE_DIGITAL 0x01u
+/*!
+ * @brief Selects pin function.: Alternative connection 0. */
+#define PIO120_FUNC_ALT0 0x00u
+/*!
+ * @brief Selects function mode (on-chip pull-up/pull-down resistor control).: Pull-up. Pull-up resistor enabled. */
+#define PIO120_MODE_PULL_UP 0x02u
+/*!
+ * @brief Controls open-drain mode.: Normal. Normal push-pull output */
+#define PIO120_OD_NORMAL 0x00u
+/*!
+ * @brief Select Analog/Digital mode.: Digital mode. */
+#define PIO17_DIGIMODE_DIGITAL 0x01u
+/*!
+ * @brief Selects pin function.: Alternative connection 0. */
+#define PIO17_FUNC_ALT0 0x00u
+/*!
+ * @brief Selects function mode (on-chip pull-up/pull-down resistor control).: Pull-up. Pull-up resistor enabled. */
+#define PIO17_MODE_PULL_UP 0x02u
+/*!
+ * @brief Controls open-drain mode.: Normal. Normal push-pull output */
+#define PIO17_OD_NORMAL 0x00u
+
+/*! @name PIO1_19 (number 16), LOCK_CTRL
+  @{ */
+#define BOARD_INITPINS_LOCK_CTRL_GPIO GPIO /*!<@brief GPIO device name: GPIO */
+#define BOARD_INITPINS_LOCK_CTRL_PORT 1U   /*!<@brief PORT device name: 1U */
+#define BOARD_INITPINS_LOCK_CTRL_PIN 19U   /*!<@brief 1U pin index: 19 */
+                                           /* @} */
+
+/*! @name PIO0_23 (number 35), COMPRESSOR_CTRL
+  @{ */
+#define BOARD_INITPINS_COMPRESSOR_CTRL_GPIO GPIO /*!<@brief GPIO device name: GPIO */
+#define BOARD_INITPINS_COMPRESSOR_CTRL_PORT 0U   /*!<@brief PORT device name: 0U */
+#define BOARD_INITPINS_COMPRESSOR_CTRL_PIN 23U   /*!<@brief 0U pin index: 23 */
+                                                 /* @} */
+
+/*! @name PIO0_4 (number 87), UNLOCK_SW
+  @{ */
+#define BOARD_INITPINS_UNLOCK_SW_GPIO GPIO /*!<@brief GPIO device name: GPIO */
+#define BOARD_INITPINS_UNLOCK_SW_PORT 0U   /*!<@brief PORT device name: 0U */
+#define BOARD_INITPINS_UNLOCK_SW_PIN 4U    /*!<@brief 0U pin index: 4 */
+                                           /* @} */
+
+/*! @name PIO1_7 (number 18), LOCK_SENSOR
+  @{ */
+#define BOARD_INITPINS_LOCK_SENSOR_GPIO GPIO /*!<@brief GPIO device name: GPIO */
+#define BOARD_INITPINS_LOCK_SENSOR_PORT 1U   /*!<@brief PORT device name: 1U */
+#define BOARD_INITPINS_LOCK_SENSOR_PIN 7U    /*!<@brief 1U pin index: 7 */
+                                             /* @} */
+
+/*! @name PIO1_1 (number 55), HOLE_SENSOR
+  @{ */
+#define BOARD_INITPINS_HOLE_SENSOR_GPIO GPIO /*!<@brief GPIO device name: GPIO */
+#define BOARD_INITPINS_HOLE_SENSOR_PORT 1U   /*!<@brief PORT device name: 1U */
+#define BOARD_INITPINS_HOLE_SENSOR_PIN 1U    /*!<@brief 1U pin index: 1 */
+                                             /* @} */
+
+/*! @name PIO1_20 (number 17), DOOR_SENSOR
+  @{ */
+#define BOARD_INITPINS_DOOR_SENSOR_GPIO GPIO /*!<@brief GPIO device name: GPIO */
+#define BOARD_INITPINS_DOOR_SENSOR_PORT 1U   /*!<@brief PORT device name: 1U */
+#define BOARD_INITPINS_DOOR_SENSOR_PIN 20U   /*!<@brief 1U pin index: 20 */
+                                             /* @} */
 
 /*!
  * @brief Select Analog/Digital mode.: Digital mode. */

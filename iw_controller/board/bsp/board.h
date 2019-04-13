@@ -38,7 +38,7 @@
 #include "clock_config.h"
 #include "fsl_common.h"
 #include "fsl_gpio.h"
-
+#include "pin_mux.h"
 /*******************************************************************************
  * Definitions
  ******************************************************************************/
@@ -50,36 +50,8 @@ extern "C" {
 /*******************************************************************************
  * API
  ******************************************************************************/
-#define  SYS_LED_GPIO                       GPIO
-#define  SYS_LED_PORT                       0
-#define  SYS_LED_PIN                        7U 
-
-#define  COMPRESSOR_CTRL_GPIO               GPIO
-#define  COMPRESSOR_CTRL_PORT               0
-#define  COMPRESSOR_CTRL_PIN                23U
-
-#define  UNLOCK_SW_GPIO                     GPIO
-#define  UNLOCK_SW_PORT                     0
-#define  UNLOCK_SW_PIN                      4U
-  
-#define  LOCK_CTRL_GPIO                     GPIO
-#define  LOCK_CTRL_PORT                     1
-#define  LOCK_CTRL_PIN                      19U
-
-#define  LOCK_SENSOR_GPIO                   GPIO
-#define  LOCK_SENSOR_PORT                   1
-#define  LOCK_SENSOR_PIN                    7U
-
-#define  HOLE_SENSOR_GPIO                   GPIO
-#define  HOLE_SENSOR_PORT                   1
-#define  HOLE_SENSOR_PIN                    1U
-  
-#define  DOOR_SENSOR_GPIO                   GPIO
-#define  DOOR_SENSOR_PORT                   1
-#define  DOOR_SENSOR_PIN                    20U
-
 #define  BSP_UNLOCK_SW_STATUS_PRESS_LEVEL   0
-#define  BSP_UNLOCK_SW_STATUS_RELEASE_LEVEL 4
+#define  BSP_UNLOCK_SW_STATUS_RELEASE_LEVEL 1
 
 #define  BSP_LOCK_UNLOCKED_LEVEL            0
 #define  BSP_LOCK_LOCKED_LEVEL              1

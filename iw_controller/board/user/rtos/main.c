@@ -56,9 +56,7 @@ uint32_t log_time()
  */
 int main(void)
 { 
-    int rc;
-    rc = bsp_board_init();
-    log_assert(rc == 0);
+    bsp_board_init();
     log_init();
     tasks_init();
     

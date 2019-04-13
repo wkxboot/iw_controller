@@ -25,12 +25,12 @@ void tasks_init(void)
     /**************************************************************************/  
 
     /*通信消息队列*/
-    osMessageQDef(communication_task_msg_q,2,uint32_t);
+    osMessageQDef(communication_task_msg_q,4,uint32_t);
     communication_task_msg_q_id = osMessageCreate(osMessageQ(communication_task_msg_q),0);
     log_assert(communication_task_msg_q_id);
 
     /*温度消息队列*/
-    osMessageQDef(temperature_task_msg_q,2,uint32_t);
+    osMessageQDef(temperature_task_msg_q,4,uint32_t);
     temperature_task_msg_q_id = osMessageCreate(osMessageQ(temperature_task_msg_q),0);
     log_assert(temperature_task_msg_q_id);
 
@@ -48,12 +48,12 @@ void tasks_init(void)
     /* 任务创建                                                               */
     /**************************************************************************/  
     /*调试任务*/
-    osThreadDef(debug_task, debug_task, osPriorityNormal, 0, 128);
+    osThreadDef(debug_task, debug_task, osPriorityNormal, 0, 256);
     debug_task_hdl = osThreadCreate(osThread(debug_task), NULL);
     log_assert(debug_task_hdl);
 
     /*看门狗任务*/
-    osThreadDef(watch_dog_task, watch_dog_task, osPriorityNormal, 0, 128);
+    osThreadDef(watch_dog_task, watch_dog_task, osPriorityNormal, 0, 256);
     watch_dog_task_hdl = osThreadCreate(osThread(watch_dog_task), NULL);
     log_assert(watch_dog_task_hdl);
 
