@@ -300,7 +300,7 @@ static int receive_adu(const int handle,uint8_t *adu,uint32_t wait_timeout)
 * @return 
 * @note
 */
-static int parse_pdu(const uint8_t *pdu,uint8_t size,const uint8_t addr,const uint8_t code,uint8_t *value)
+static int parse_pdu(const uint8_t *pdu,int size,const uint8_t addr,const uint8_t code,uint8_t *value)
 {
     int rc;
     uint8_t opt_code;

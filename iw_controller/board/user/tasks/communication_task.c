@@ -81,7 +81,7 @@ static communication_task_contex_t communication_task_contex;
 #define  DATA_RESULT_CALIBRATION_FAIL               0x00
 #define  DATA_RESULT_SET_TEMPERATURE_SUCCESS        0x01
 #define  DATA_RESULT_SET_TEMPERATURE_FAIL           0x00
-#define  DATA_MANUFACTURER_CHANGHONG_ID             0x1101
+#define  DATA_MANUFACTURER_CHANGHONG_ID             0x1102
 /*CRC16域*/
 #define  ADU_CRC_SIZE                               2
 
@@ -1203,7 +1203,9 @@ static int get_serial_handle_by_port(communication_task_contex_t *contex,uint8_t
 /*控制器任务通信中断处理*/
 void FLEXCOMM0_IRQHandler()
 {
-    nxp_serial_uart_hal_isr(communication_serial_handle);
+    if (communication_serial_handle > 0) {
+        nxp_serial_uart_hal_isr(communication_serial_handle);
+    }
 
 }
 
