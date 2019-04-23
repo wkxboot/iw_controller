@@ -89,7 +89,7 @@ static communication_task_contex_t communication_task_contex;
 /*协议时间*/
 #define  ADU_WAIT_TIMEOUT                           osWaitForever
 #define  ADU_FRAME_TIMEOUT                          3
-#define  ADU_RSP_TIMEOUT                            200
+#define  ADU_RSP_TIMEOUT                            25
 #define  ADU_LOCK_RSP_TIMEOUT                       600
 #define  ADU_SCALE_CNT_MAX                          20
 #define  ADU_SEND_TIMEOUT                           5
