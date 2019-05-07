@@ -14,7 +14,7 @@ void communication_task(void const * argument);
 #define  COMMUNICATION_TASK_SERIAL_STOPBITS             1
 
 
-#define  COMMUNICATION_TASK_RX_BUFFER_SIZE              64
+#define  COMMUNICATION_TASK_RX_BUFFER_SIZE              2048
 #define  COMMUNICATION_TASK_TX_BUFFER_SIZE              64
 
 #define  COMMUNICATION_TASK_COMMUNICATION_ADDR          1
@@ -24,6 +24,19 @@ void communication_task(void const * argument);
 
 #define  SCALE_CNT_MAX                                  8
 #define  COMMUNICATION_TASK_SCALE_DEFAULT_ADDR          1
+
+#define  COMMUNICATION_TASK_UPDATE_TIMEOUT              20000
+#define  COMMUNICATION_TASK_APPLICATION_UPDATE          0x11223344
+#define  COMMUNICATION_TASK_APPLICATION_NORMAL          0
+
+typedef struct
+{
+    uint32_t update;
+    uint32_t size;
+    char md5[16];
+    char md5_str[33];
+}application_update_t;
+
 
 typedef struct
 {
@@ -51,6 +64,7 @@ typedef struct
 {
     bool initialized;
     uint16_t manufacturer_id;
+    uint32_t software_version;
     uint8_t cnt;
     scale_task_contex_t scale_task_contex[SCALE_CNT_MAX];
     osMessageQId net_weight_rsp_msg_q_id;

@@ -78,7 +78,7 @@ void tasks_init(void)
     log_assert(temperature_task_hdl);
 
     /*主控器通信任务*/
-    osThreadDef(communication_task, communication_task, osPriorityNormal, 0, 256);
+    osThreadDef(communication_task, communication_task, osPriorityNormal, 0, 300);
     communication_task_hdl = osThreadCreate(osThread(communication_task), NULL);
     log_assert(communication_task_hdl);
 

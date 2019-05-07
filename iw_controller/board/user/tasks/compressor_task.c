@@ -2,7 +2,9 @@
 #include "tasks_init.h"
 #include "board.h"
 #include "compressor_task.h"
-#include "nv_flash.h"
+#include "device_env.h"
+#include "stdlib.h"
+#include "stdio.h"
 #include "log.h"
 
 /*任务句柄*/
@@ -157,6 +159,9 @@ void compressor_task(void const *argument)
     osEvent  os_event;
     osStatus status;
     uint8_t level;
+    char *temperature_str;
+    char temperature_str_buffer[7];
+
     compressor_task_message_t req_msg,req_update_msg,rsp_setting_msg;
     
     /*上电先关闭压缩机*/
@@ -165,15 +170,15 @@ void compressor_task(void const *argument)
     compressor_timer_init();
     /*消除编译警告*/
     compressor_timer_stop();
-    /*nv flash初始化*/
-    rc = nv_flash_region_int();
-    log_assert(rc == 0);
+
     /*读取温度配置*/
-    rc = nv_flash_read_user_data(0,&level,1);
-    if (rc <= 0) {
+    temperature_str = device_env_get(COMPRESSOR_TASK_TEMPERATURE_ENV_NAME);
+
+    if (temperature_str == NULL) {
         log_info("level not exsit in flash.default:%d.\r\n",COMPRESSOR_TASK_TEMPERATURE_LEVEL_DEFAULT);
         compressor.level = COMPRESSOR_TASK_TEMPERATURE_LEVEL_DEFAULT;
     } else {
+        level = atoi(temperature_str);
         if (level < COMPRESSOR_TASK_TEMPERATURE_LEVEL_CNT) {
             log_info("level:%d exsit in flash.valid.\r\n",level);
             compressor.level = level;
@@ -332,7 +337,8 @@ void compressor_task(void const *argument)
                 rsp_setting_msg.response.result = COMPRESSOR_TASK_SUCCESS;
                 if (compressor.level != level) {
                     compressor.level = level;
-                    rc = nv_flash_save_user_data(0,&level,1);
+                    snprintf(temperature_str_buffer,7,"%d",level);
+                    rc = device_env_set(COMPRESSOR_TASK_TEMPERATURE_ENV_NAME,temperature_str_buffer);
                     if (rc != 0) {
                         rsp_setting_msg.response.result = COMPRESSOR_TASK_FAIL;
                         log_error("nv flash save temperature fail.\r\n");

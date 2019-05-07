@@ -1,5 +1,7 @@
 #ifndef  __NV_FLASH_H__
 #define  __NV_FLASH_H__
+#include "stdint.h"
+
 
 #ifdef __cplusplus
     extern "C" {
@@ -12,30 +14,50 @@
 #define  NV_FLASH_MAX_INTERRUPT_PRIORITY          (NV_FLASH_PRIORITY_HIGH << (8 - NV_FLASH_PRIORITY_BITS))
 
 /*
-* @brief nv_flash_region_int nv flash数据区域初始化
+* @brief flash_if_init 数据区域初始化
 * @param 无
 * @return 0 成功 -1 失败
 * @note
 */
-int nv_flash_region_int(void);
+int flash_if_init(void);
+
 /*
-* @brief nv_flash_save_user_data 数据保存,保证断电可靠
-* @param offset 保存的偏移地址
-* @param src 数据保存的地址
-* @param cnt 数据量
-* @return 0 成功 -1 失败
-* @note
-*/
-int nv_flash_save_user_data(uint32_t offset,uint8_t *src,uint32_t cnt);
-/*
-* @brief nv flash 数据读取
-* @param offset 读取偏移地址
+* @brief flash_if_read 数据读取
+* @param addr 地址
 * @param dst 数据保存的地址
-* @param cnt 读取的数据量
+* @param size 数据量
 * @return 0 成功 -1 失败
 * @note
 */
-int nv_flash_read_user_data(uint32_t offset,uint8_t *dst,uint32_t cnt);
+int flash_if_read(uint32_t addr,uint8_t *dst,uint32_t size);
+
+/*
+* @brief 擦除指定地址数据(页擦除)
+* @param addr 擦除开始地址
+* @param size 擦除数据量
+* @return 0：成功 -1：失败
+* @note
+*/
+int flash_if_erase(uint32_t addr,uint32_t size);
+
+/*
+* @brief 扇区擦除指定地址数据
+* @param addr 擦除开始地址
+* @param size 擦除数据量
+* @return 0：成功 -1：失败
+* @note
+*/
+int flash_if_erase_sector(uint32_t addr,uint32_t size);
+
+/*
+* @brief flash_if_write 数据编程写入
+* @param addr 读取偏移地址
+* @param src 数据保存的地址
+* @param size 读取的数据量
+* @return 0 成功 -1 失败
+* @note
+*/
+int flash_if_write(uint32_t addr,uint8_t *src,uint32_t size);
 
 
 #ifdef __ICCARM__
@@ -99,18 +121,13 @@ int nv_flash_read_user_data(uint32_t offset,uint8_t *dst,uint32_t cnt);
 #endif
 #endif  
 
+
+
+
+
 #ifdef __cplusplus
     }
 #endif
-
-
-
-
-
-
-
-
-
 
 
 

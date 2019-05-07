@@ -363,7 +363,10 @@
                     <state>$PROJ_DIR$/../../board/user/rtos</state>
                     <state>$PROJ_DIR$/../../board/user/circle_buffer</state>
                     <state>$PROJ_DIR$/../../board/user/utils</state>
-                    <state>$PROJ_DIR$/../../board/user/nv_flash</state>
+                    <state>$PROJ_DIR$/../../board/user/flash_if</state>
+                    <state>$PROJ_DIR$/../../board/user/device_env</state>
+                    <state>$PROJ_DIR$/../../board/user/update</state>
+                    <state>$PROJ_DIR$/../../board/user/lib</state>
                 </option>
                 <option>
                     <name>CCStdIncCheck</name>
@@ -2123,9 +2126,30 @@
                 </group>
             </group>
             <group>
-                <name>nv_flash</name>
+                <name>device_env</name>
                 <file>
-                    <name>$PROJ_DIR$\..\user\nv_flash\nv_flash.c</name>
+                    <name>$PROJ_DIR$\..\user\device_env\device_env.c</name>
+                </file>
+            </group>
+            <group>
+                <name>flash_if</name>
+                <file>
+                    <name>$PROJ_DIR$\..\user\flash_if\flash_if.c</name>
+                </file>
+            </group>
+            <group>
+                <name>lib</name>
+                <file>
+                    <name>$PROJ_DIR$\..\user\lib\crc16.c</name>
+                </file>
+                <file>
+                    <name>$PROJ_DIR$\..\user\lib\md5.c</name>
+                </file>
+                <file>
+                    <name>$PROJ_DIR$\..\user\lib\utils.c</name>
+                </file>
+                <file>
+                    <name>$PROJ_DIR$\..\user\lib\ymodem.c</name>
                 </file>
             </group>
             <group>
@@ -2183,9 +2207,9 @@
                 </file>
             </group>
             <group>
-                <name>utils</name>
+                <name>update</name>
                 <file>
-                    <name>$PROJ_DIR$\..\user\utils\utils.c</name>
+                    <name>$PROJ_DIR$\..\user\update\update.c</name>
                 </file>
             </group>
         </group>

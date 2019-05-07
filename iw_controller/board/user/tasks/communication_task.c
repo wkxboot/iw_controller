@@ -9,11 +9,15 @@
 #include "temperature_task.h"
 #include "compressor_task.h"
 #include "communication_task.h"
+#include "ymodem.h"
+#include "device_env.h"
+#include "md5.h"
 #include "log.h"
 
 osThreadId   communication_task_hdl;
 osMessageQId communication_task_msg_q_id;
-int communication_serial_handle;
+/*通信串口句柄*/
+static int communication_serial_handle;
 
 extern serial_hal_driver_t nxp_serial_uart_hal_driver;
 extern void nxp_serial_uart_hal_isr(int handle);
@@ -40,7 +44,9 @@ static communication_task_contex_t communication_task_contex;
 #define  CODE_QUERY_LOCK_STATUS                     0x23  
 #define  CODE_QUERY_TEMPERATURE                     0x41  
 #define  CODE_SET_TEMPERATURE                       0x0A 
-#define  CODE_QUERY_MANUFACTURER                    0x51 
+#define  CODE_QUERY_MANUFACTURER_HARDWARE_VER       0x51 
+#define  CODE_QUERY_SOFTWARE_VER                    0x52
+#define  CODE_NOTIFY_UPDATE                         0x53
 /*数据域*/
 #define  ADU_DATA_REGION_OFFSET                     2
 #define  ADU_DATA_REGION_REMOVE_TARE_SIZE           1 
@@ -53,13 +59,17 @@ static communication_task_contex_t communication_task_contex;
 #define  ADU_DATA_REGION_QUERY_LOCK_STATUS_SIZE     0
 #define  ADU_DATA_REGION_QUERY_TEMPERATURE_SIZE     0
 #define  ADU_DATA_REGION_SET_TEMPERATURE_SIZE       1
-#define  ADU_DATA_REGION_QUERY_MANUFACTURER_SIZE    0
+#define  ADU_DATA_REGION_QUERY_HARDWARE_VER_SIZE    0
+#define  ADU_DATA_REGION_QUERY_SOFTWARE_VER_SIZE    0
+#define  ADU_DATA_REGION_NOTIFY_UPDATE_SIZE         20
 
 
 #define  DATA_REGION_SCALE_ADDR_OFFSET              0
 #define  DATA_REGION_CALIBRATION_WEIGHT_OFFSET      1
 #define  DATA_REGION_SCALE_CNT_OFFSET               0
 #define  DATA_REGION_TEMPERATURE_OFFSET             0
+#define  DATA_REGION_FILE_SIZE_OFFSET               0
+#define  DATA_REGION_FILE_MD5_OFFSET                4
 #define  DATA_REGION_STATUS_OFFSET                  0
 
 /*协议操作值定义*/
@@ -81,7 +91,8 @@ static communication_task_contex_t communication_task_contex;
 #define  DATA_RESULT_CALIBRATION_FAIL               0x00
 #define  DATA_RESULT_SET_TEMPERATURE_SUCCESS        0x01
 #define  DATA_RESULT_SET_TEMPERATURE_FAIL           0x00
-#define  DATA_MANUFACTURER_CHANGHONG_ID             0x1102
+#define  DATA_MANUFACTURER_CHANGHONG_ID             0x0101
+
 /*CRC16域*/
 #define  ADU_CRC_SIZE                               2
 
@@ -802,7 +813,7 @@ static int set_temperature_level(communication_task_contex_t *contex,uint8_t tem
 }
 
 /*
-* @brief 查询厂家ID
+* @brief 查询厂家ID和硬件版本
 * @param contex 通信任务上下文
 * @param manufacturer 厂家id指针
 * @return -1 失败
@@ -810,9 +821,89 @@ static int set_temperature_level(communication_task_contex_t *contex,uint8_t tem
 * @note
 */
 
-static int query_manufacturer(communication_task_contex_t *contex,uint16_t *manufacturer)
+static int query_manufacturer_and_hardware_version(communication_task_contex_t *contex,uint16_t *manufacturer)
 {
     *manufacturer = contex->manufacturer_id;
+    return 0;
+}
+/*
+* @brief 查询软件版本
+* @param contex 通信任务上下文
+* @param manufacturer软件版本指针
+* @return -1 失败
+* @return  0 成功
+* @note
+*/
+
+static int query_software_version(communication_task_contex_t *contex,uint32_t *software_version)
+{
+    *software_version = contex->software_version;
+    return 0;
+}
+/*
+* @brief 处理升级
+* @param contex 通信任务上下文
+* @param manufacturer软件版本指针
+* @return -1 失败
+* @return  0 成功
+* @note
+*/
+
+static int process_update(application_update_t *update,uint32_t timeout)
+{
+    COM_StatusTypeDef status;
+    char file_name[100];
+    char md5_value[16];
+    char md5_str_buffer[33];
+    char size_str_buffer[7];
+
+    uint32_t size = 0;
+    
+    status = Ymodem_Receive(communication_serial_handle,APPLICATION_UPDATE_BASE_ADDR,APPLICATION_SIZE_LIMIT,file_name,&size);
+    if (status == COM_OK) {
+        if (size != update->size) {
+            log_error("file ymodem get size:%d != notify size:%d.\r\n",size,update->size);
+            return -1;
+        }
+        /*计算MD5*/
+        md5((char *)APPLICATION_UPDATE_BASE_ADDR,size,md5_value);
+        dump_hex_str(md5_value,md5_str_buffer,16);
+
+        if (strcmp(md5_str_buffer,update->md5_str) != 0) {
+            log_error("file md5 calculate:%s != notify md5:%s.\r\n",md5_str_buffer,update->md5_str);
+            return -1;
+        }
+        /*int转换成字符串*/
+        snprintf(size_str_buffer,7,"%d",size);
+
+        log_debug("update size:%s md5:%s ok.\r\n",size_str_buffer,md5_str_buffer);
+
+        /*设置更新size*/
+        log_debug("set update size env...\r\n");
+        if (device_env_set(ENV_BOOTLOADER_UPDATE_SIZE_NAME,size_str_buffer) != 0) {
+            return -1;
+        }
+        /*设置更新md5*/
+        log_debug("set update md5 env...\r\n");
+        if (device_env_set(ENV_BOOTLOADER_UPDATE_MD5_NAME,md5_str_buffer)!= 0) {
+            return -1;
+        }
+        log_debug("set flag new env...\r\n");
+        /*设置更新标志*/
+        device_env_set(ENV_BOOTLOADER_FLAG_NAME,ENV_BOOTLOADER_NEW);
+
+        log_debug("all done. reboot...\r\n");
+        /*禁止看门狗*/
+        WWDT_Deinit(WWDT);
+        /*复位准备升级*/
+        extern void hal_delay(void);
+        hal_delay();
+        __NVIC_SystemReset();
+    } else {
+        log_error("ymodem recv err:%d.\r\n",status);
+        return -1;
+    }
+
     return 0;
 }
 
@@ -873,12 +964,13 @@ static int receive_adu(int handle,uint8_t *adu,uint8_t size,uint32_t timeout)
 * @param adu 数据缓存指针
 * @param size 数据大小
 * @param rsp 回应的数据缓存指针
+* @param update 回应的是否需要升级
 * @return -1 失败 
 * @return  > 0 回应的adu大小
 * @note
 */
 
-static int parse_adu(uint8_t *adu,uint8_t size,uint8_t *rsp)
+static int parse_adu(uint8_t *adu,uint8_t size,uint8_t *rsp,application_update_t *update)
 {
     int rc;
     uint8_t communication_addr;
@@ -886,6 +978,7 @@ static int parse_adu(uint8_t *adu,uint8_t size,uint8_t *rsp)
     uint8_t scale_addr;
     uint8_t temperature_setting;
     uint16_t manufacturer_id;
+    uint32_t software_verion;
     uint16_t calibration_weight;
     uint16_t crc_received,crc_calculated;
 
@@ -1088,16 +1181,51 @@ static int parse_adu(uint8_t *adu,uint8_t size,uint8_t *rsp)
                 rsp[rsp_offset ++] = DATA_RESULT_SET_TEMPERATURE_FAIL; 
             }                
             break;
-        case CODE_QUERY_MANUFACTURER:/*查询厂商ID*/
-            if (size != ADU_DATA_REGION_QUERY_MANUFACTURER_SIZE) {
-                log_error("query manafacture data size:%d != %d err.\r\n",size,ADU_DATA_REGION_QUERY_MANUFACTURER_SIZE);
+        case CODE_QUERY_MANUFACTURER_HARDWARE_VER:/*查询厂商ID*/
+            if (size != ADU_DATA_REGION_QUERY_HARDWARE_VER_SIZE) {
+                log_error("query manafacture data size:%d != %d err.\r\n",size,ADU_DATA_REGION_QUERY_HARDWARE_VER_SIZE);
                 return -1;
             }
             log_debug("query manufacture...\r\n");
-            query_manufacturer(&communication_task_contex,&manufacturer_id);
+            query_manufacturer_and_hardware_version(&communication_task_contex,&manufacturer_id);
             rsp[rsp_offset ++] = (manufacturer_id >> 8) & 0xFF;      
             rsp[rsp_offset ++] = manufacturer_id & 0xFF;      
             break;  
+        case CODE_QUERY_SOFTWARE_VER:/*查询软件版本*/
+            if (size != ADU_DATA_REGION_QUERY_SOFTWARE_VER_SIZE) {
+                log_error("query software data size:%d != %d err.\r\n",size,ADU_DATA_REGION_QUERY_SOFTWARE_VER_SIZE);
+                return -1;
+            }
+            log_debug("query software ver...\r\n");
+            query_software_version(&communication_task_contex,&software_verion);
+            rsp[rsp_offset ++] = (software_verion >> 16) & 0xFF;  
+            rsp[rsp_offset ++] = (software_verion >> 8) & 0xFF;      
+            rsp[rsp_offset ++] = software_verion & 0xFF;      
+            break;
+
+        case CODE_NOTIFY_UPDATE:/*通知升级信息*/
+            if (size != ADU_DATA_REGION_NOTIFY_UPDATE_SIZE) {
+                log_error("query manafacture data size:%d != %d err.\r\n",size,ADU_DATA_REGION_NOTIFY_UPDATE_SIZE);
+                return -1;
+            }
+            log_debug("notify update...\r\n");
+
+            
+            /*复制文件长度*/
+            update->size = 0;
+            update->size |= (uint32_t)adu[ADU_DATA_REGION_OFFSET + DATA_REGION_FILE_SIZE_OFFSET + 0] << 24;
+            update->size |= (uint32_t)adu[ADU_DATA_REGION_OFFSET + DATA_REGION_FILE_SIZE_OFFSET + 1] << 16;
+            update->size |= (uint32_t)adu[ADU_DATA_REGION_OFFSET + DATA_REGION_FILE_SIZE_OFFSET + 2] << 8;
+            update->size |= (uint32_t)adu[ADU_DATA_REGION_OFFSET + DATA_REGION_FILE_SIZE_OFFSET + 3] << 0;
+            /*复制MD5*/
+            for (uint8_t i = 0;i < 16 ;i ++) {
+                update->md5[i] = adu[ADU_DATA_REGION_OFFSET + DATA_REGION_FILE_MD5_OFFSET + i];
+            }
+            dump_hex_str(update->md5,update->md5_str,16);
+            update->update = COMMUNICATION_TASK_APPLICATION_UPDATE;
+            log_debug("update file size:%d md5:%s\r\n",update->size,update->md5_str);
+
+            break;
         default:
             log_error("unknow code:%d err.\r\n",code);
     }
@@ -1393,8 +1521,11 @@ static void communication_task_contex_init(communication_task_contex_t *contex)
     osMessageQDef(calibration_full_rsp_msg_q,SCALE_CNT_MAX,uint32_t);
     contex->calibration_full_rsp_msg_q_id = osMessageCreate(osMessageQ(calibration_full_rsp_msg_q),0);
     log_assert(contex->calibration_full_rsp_msg_q_id);
-    /*厂商ID*/
+    /*厂商ID和硬件版本*/
     contex->manufacturer_id = DATA_MANUFACTURER_CHANGHONG_ID;
+
+    /*软件版本*/
+    contex->software_version = FIRMWARE_VERSION_HEX;
 
     contex->initialized = true;
 }
@@ -1408,6 +1539,9 @@ static void communication_task_contex_init(communication_task_contex_t *contex)
 void communication_task(void const * argument)
 {
     int rc; 
+    application_update_t update;
+    
+
     uint8_t adu_recv[ADU_SIZE_MAX];
     uint8_t adu_send[ADU_SIZE_MAX];
  
@@ -1426,6 +1560,9 @@ void communication_task(void const * argument)
     communication_task_contex_init(&communication_task_contex);
     log_debug("communication task contex init ok.\r\n");
 
+    /*默认配置不升级*/
+    update.update = COMMUNICATION_TASK_APPLICATION_NORMAL;
+
     /*清空接收缓存*/
     serial_flush(communication_serial_handle);
     while (1) {
@@ -1438,14 +1575,22 @@ void communication_task(void const * argument)
             continue;
         }
         /*解析处理pdu*/
-        rc = parse_adu(adu_recv,rc,adu_send);
+        rc = parse_adu(adu_recv,rc,adu_send,&update);
         if (rc < 0) {
+            update.update = COMMUNICATION_TASK_APPLICATION_NORMAL;
             continue;
         }
         /*回应主机处理结果*/
         rc = send_adu(communication_serial_handle,adu_send,rc,ADU_SEND_TIMEOUT);
         if (rc < 0) {
             continue;
+        }
+        if (update.update == COMMUNICATION_TASK_APPLICATION_UPDATE) {
+            rc = process_update(&update,COMMUNICATION_TASK_UPDATE_TIMEOUT);
+            update.update = COMMUNICATION_TASK_APPLICATION_NORMAL;
+            if (rc < 0) {
+                log_error("update err.\r\n");
+            }
         }
 
     }

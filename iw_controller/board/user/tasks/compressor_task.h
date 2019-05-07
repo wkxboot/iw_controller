@@ -36,6 +36,8 @@ void compressor_task(void const *argument);
 #define  COMPRESSOR_TASK_TEMPERATURE_LEVEL_CNT         4
 #define  COMPRESSOR_TASK_TEMPERATURE_LEVEL_DEFAULT     0
 
+#define  COMPRESSOR_TASK_TEMPERATURE_ENV_NAME          "temperature"
+
 enum
 {
   COMPRESSOR_TASK_MSG_TYPE_TEMPERATURE_UPDATE,

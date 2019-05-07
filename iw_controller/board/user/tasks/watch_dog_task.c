@@ -58,15 +58,18 @@ void watch_dog_task(void const * argument)
     /* Setup watchdog clock frequency(Hz). */
     config.clockFreq_Hz = WDT_CLK_FREQ;
 
-    WWDT_Init(WWDT, &config);
+    //WWDT_Init(WWDT, &config);
 
     while (1)
     {
+
         osDelay(WATCH_DOG_TASK_INTERVAL);   
+        /*
         if (WWDT->TV < WWDT->WINDOW) {
             WWDT_Refresh(WWDT);
             log_debug("feed dog.\r\n");
         }
+        */
     }
 }  
   

@@ -34,12 +34,37 @@ do {                                                \
 #endif
 
 
+#define IS_CAP_LETTER(c)    (((c) >= 'A') && ((c) <= 'F'))
+#define IS_LC_LETTER(c)     (((c) >= 'a') && ((c) <= 'f'))
+#define IS_09(c)            (((c) >= '0') && ((c) <= '9'))
+#define ISVALIDHEX(c)       (IS_CAP_LETTER(c) || IS_LC_LETTER(c) || IS_09(c))
+#define ISVALIDDEC(c)       IS_09(c)
+#define CONVERTDEC(c)       (c - '0')
+
+#define CONVERTHEX_ALPHA(c) (IS_CAP_LETTER(c) ? ((c) - 'A'+10) : ((c) - 'a'+10))
+#define CONVERTHEX(c)       (IS_09(c) ? ((c) - '0') : CONVERTHEX_ALPHA(c))
 
 
 
 /*字节转换成HEX字符串*/
- void bytes_to_hex_str(const char *src,char *dest,uint16_t src_len);
+ void dump_hex_str(const char *src,char *dest,uint16_t src_len);
    
+/**
+  * @brief  Convert an Integer to a string
+  * @param  p_str: The string output pointer
+  * @param  intnum: The integer to be converted
+  * @retval None
+  */
+void Int2Str(uint8_t *p_str, uint32_t intnum);
+
+/**
+  * @brief  Convert a string to an integer
+  * @param  p_inputstr: The string to be converted
+  * @param  p_intnum: The integer value
+  * @retval 1: Correct
+  *         0: Error
+  */
+uint32_t Str2Int(uint8_t *p_inputstr, uint32_t *p_intnum);
    
 /* 函数：utils_timer_init
 *  功能：自定义定时器初始化
