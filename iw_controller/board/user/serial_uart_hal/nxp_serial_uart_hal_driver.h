@@ -68,7 +68,7 @@ void nxp_serial_uart_hal_disable_rxne_it(uint8_t port);
 * @return 无
 * @note
 */
-void nxp_serial_uart_hal_isr(int handle);
+void nxp_serial_uart_hal_isr(serial_handle_t *handle);
 
 
 

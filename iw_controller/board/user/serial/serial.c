@@ -17,11 +17,7 @@
 *                                                                            
 *                                                                            
 *****************************************************************************/
-#include "cmsis_os.h"
-#include "utils.h"
 #include "serial.h"
-#include "log.h"
-
 
 
 /*
@@ -33,22 +29,19 @@
 * @return >= 0 实际读取的数量
 * @note 可重入
 */
-int serial_read(int handle,char *dst,int size)
+int serial_read(serial_handle_t *handle,char *dst,int size)
 {
     int read;
-    serial_t *s;
-    
-    s = (serial_t *)handle;
   
-    if (s->init == false || size < 0){
+    if (handle->init == false || size < 0){
         return -1;
     }
-    read = circle_buffer_read(&s->recv,dst,size); 
 
     SERIAL_ENTER_CRITICAL();
-    if (read > 0 && s->full == true) {
-        s->full = false;
-        s->driver->enable_rxne_it(s->port);  
+    read = circle_buffer_read(&handle->recv,dst,size); 
+    if (read > 0 && handle->recv_full == true) {
+        handle->recv_full = false;
+        handle->driver->enable_rxne_it(handle->port);  
     }
     SERIAL_EXIT_CRITICAL();
 
@@ -64,22 +57,20 @@ int serial_read(int handle,char *dst,int size)
 * @return >= 0 实际写入的数量
 * @note 可重入
 */
-int serial_write(int handle,const char *src,int size)
+int serial_write(serial_handle_t *handle,const char *src,int size)
 {
     int write;
-    serial_t *s;
-    
-    log_assert(src);
-    s = (serial_t *)handle; 
-    if (s->init == false || size < 0){
+
+    if (handle->init == false || size < 0){
         return -1;
     }
 
-    write = circle_buffer_write(&s->send,src,size);
     SERIAL_ENTER_CRITICAL();
-    if (write > 0 && s->empty == true){
-        s->empty = false;
-        s->driver->enable_txe_it(s->port);
+    write = circle_buffer_write(&handle->send,src,size);
+
+    if (write > 0 && handle->send_empty == true){
+        handle->send_empty = false;
+        handle->driver->enable_txe_it(handle->port);
     }
     SERIAL_EXIT_CRITICAL();
 
@@ -92,24 +83,21 @@ int serial_write(int handle,const char *src,int size)
 * @return >=0 刷新的接收缓存数量
 * @note 
 */
-int serial_flush(int handle)
+int serial_flush(serial_handle_t *handle)
 {
     int size;
-    serial_t *s;
- 
-    s = (serial_t *)handle; 	
 
-    if (s->registered == false ) {
-        log_error("serial handle:%d not registered.\r\n",handle);
+    if (handle->registered == false ) {
         return -1;
     }
+
     SERIAL_ENTER_CRITICAL();
-    s->empty = true;
-    s->full = false;
-    s->driver->disable_txe_it(s->port);
-    s->driver->enable_rxne_it(s->port);
-    circle_buffer_flush(&s->send);
-    size = circle_buffer_flush(&s->recv);
+    handle->send_empty = true;
+    handle->recv_full = false;
+    handle->driver->disable_txe_it(handle->port);
+    handle->driver->enable_rxne_it(handle->port);
+    circle_buffer_flush(&handle->send);
+    size = circle_buffer_flush(&handle->recv);
     SERIAL_EXIT_CRITICAL();
 
     return size;
@@ -121,29 +109,25 @@ int serial_flush(int handle)
 * @return = 0 成功
 * @note 
 */
-int serial_open(int handle,uint8_t port,uint32_t baud_rates,uint8_t data_bits,uint8_t stop_bits)
+int serial_open(serial_handle_t *handle,uint8_t port,uint32_t baud_rates,uint8_t data_bits,uint8_t stop_bits)
 {
     int rc;
-    serial_t *s;
- 
-    s = (serial_t *)handle;	   
 
-    if (s->registered == false){
-        log_error("serial handle:%d not registered.\r\n",handle);
+    if (handle->registered == false){
         return -1;
     }
  
-    rc = s->driver->init(port,baud_rates,data_bits,stop_bits);
+    rc = handle->driver->init(port,baud_rates,data_bits,stop_bits);
     if (rc != 0){
         return -1;
     }
     SERIAL_ENTER_CRITICAL();
-    s->init = true;
-    s->port = port;
-    s->baud_rates = baud_rates;
-    s->data_bits = data_bits;
-    s->stop_bits = stop_bits;
-    s->driver->enable_rxne_it(s->port);
+    handle->init = true;
+    handle->port = port;
+    handle->baud_rates = baud_rates;
+    handle->data_bits = data_bits;
+    handle->stop_bits = stop_bits;
+    handle->driver->enable_rxne_it(handle->port);
     SERIAL_EXIT_CRITICAL();
 
     return 0;
@@ -156,94 +140,28 @@ int serial_open(int handle,uint8_t port,uint32_t baud_rates,uint8_t data_bits,ui
 * @return = 0 成功
 * @note 
 */
-int serial_close(int handle)
+int serial_close(serial_handle_t *handle)
 {
     int rc = 0;
-    serial_t *s;
 
-    s=(serial_t *)handle;
-
-    if (s->registered == false){
+    if (handle->registered == false){
         return -1;
     }
 
-    rc = s->driver->deinit(s->port);
+    rc = handle->driver->deinit(handle->port);
     if (rc != 0){
         return -1;
     }
 
     SERIAL_ENTER_CRITICAL();
-    s->init = false;
-    s->empty = true;
-    s->full = false;
-    s->driver->disable_rxne_it(s->port);
-    s->driver->disable_txe_it(s->port);
+    handle->init = false;
+    handle->send_empty = true;
+    handle->recv_full = false;
+    handle->driver->disable_rxne_it(handle->port);
+    handle->driver->disable_txe_it(handle->port);
     SERIAL_EXIT_CRITICAL();
  
     return 0;
-}
-
-/*
-* @brief  串口等待数据
-* @param handle 串口句柄
-* @param timeout 超时时间
-* @return < 0 失败
-* @return = 0 等待超时
-* @return > 0 等待的数据量
-* @note 
-*/
-int serial_select(int handle,uint32_t timeout)
-{
-    int size;
-    utils_timer_t timer;
-    serial_t *s;
- 
-    s=(serial_t *)handle;	
-
-    if (s->init == false) {
-        log_error("serial handle:%d not open.\r\n",handle);
-        return -1;
-    } 
-    utils_timer_init(&timer,timeout,false);
-
-    do {
-        size = circle_buffer_used_size(&s->recv);
-        if (size == 0) {
-            osDelay(1);
-        }
-    } while (utils_timer_value(&timer) > 0 && size == 0);
-        
-    return size;
-}
-
-
-/*
-* @brief  串口等待数据发送完毕
-* @param handle 串口句柄
-* @param timeout 超时时间
-* @return < 0 失败
-* @return = 0 等待发送超时
-* @return > 0 实际发送的数据量
-* @note 
-*/
-int serial_complete(int handle,uint32_t timeout)
-{
-    utils_timer_t timer;
-    serial_t *s;
-
-    s =(serial_t *)handle;	 
-
-    if (s->init == false){
-        log_error("serial handle:%d not open.\r\n",handle);
-        return -1;
-    } 
-    utils_timer_init(&timer,timeout,false);
-
-    while (utils_timer_value(&timer) > 0 && s->empty == false) {
-        osDelay(1);
-    }
-
-    return circle_buffer_used_size(&s->send);
 }
 
 /*
@@ -254,22 +172,18 @@ int serial_complete(int handle,uint32_t timeout)
 * @return = 0 成功
 * @note 
 */
-int serial_register_hal_driver(int handle,serial_hal_driver_t *driver)
+int serial_register_hal_driver(serial_handle_t *handle,serial_hal_driver_t *driver)
 {
-    serial_t *s;
- 
-    s=(serial_t *)handle; 
+    assert(driver);
+    assert(driver->init);
+    assert(driver->deinit);
+    assert(driver->enable_txe_it);
+    assert(driver->disable_txe_it);
+    assert(driver->enable_rxne_it);
+    assert(driver->disable_rxne_it);
 
-    log_assert(driver);
-    log_assert(driver->init);
-    log_assert(driver->deinit);
-    log_assert(driver->enable_txe_it);
-    log_assert(driver->disable_txe_it);
-    log_assert(driver->enable_rxne_it);
-    log_assert(driver->disable_rxne_it);
-
-    s->driver = driver;
-    s->registered = true;
+    handle->driver = driver;
+    handle->registered = true;
 
     return 0;
 }
@@ -284,23 +198,19 @@ int serial_register_hal_driver(int handle,serial_hal_driver_t *driver)
 * @return = 0 成功
 * @note 
 */
-int isr_serial_get_byte_to_send(int handle,char *byte_send)
+int isr_serial_get_byte_to_send(serial_handle_t *handle,char *byte_send)
 {
     int size;
-    serial_t *s;
-  
-    s=(serial_t *)handle;	
 
-    if (s->init == false){
-        log_error("serial handle:%d not open.\r\n",handle);
+    if (handle->init == false){
         return -1;
     } 
     SERIAL_ENTER_CRITICAL();
-    size = circle_buffer_read(&s->send,byte_send,1);
+    size = circle_buffer_read(&handle->send,byte_send,1);
     /*发送缓存中已经没有待发送的数据，关闭发送中断*/
     if (size == 0) {
-        s->empty = true; 
-        s->driver->disable_txe_it(s->port);
+        handle->send_empty = true; 
+        handle->driver->disable_txe_it(handle->port);
     }
     SERIAL_EXIT_CRITICAL();
 
@@ -314,24 +224,19 @@ int isr_serial_get_byte_to_send(int handle,char *byte_send)
 * @return = 0 成功
 * @note 
 */
-int isr_serial_put_byte_from_recv(int handle,char recv_byte)
+int isr_serial_put_byte_from_recv(serial_handle_t *handle,char recv_byte)
 {
- 
     int size;
-    serial_t *s;
 
-    s=(serial_t *)handle;	
- 
-    if (s->init == false){
-        log_error("serial handle:%d not open.\r\n",handle);
+    if (handle->init == false){
         return -1;
     } 
     SERIAL_ENTER_CRITICAL();
-    size = circle_buffer_write(&s->recv,&recv_byte,1);
+    size = circle_buffer_write(&handle->recv,&recv_byte,1);
     /*接收缓存中已经没有空间，关闭接收中断*/
     if (size == 0) {
-        s->full = true;
-        s->driver->disable_rxne_it(s->port);
+        handle->recv_full = true;
+        handle->driver->disable_rxne_it(handle->port);
     }
     SERIAL_EXIT_CRITICAL();
 
@@ -346,81 +251,94 @@ int isr_serial_put_byte_from_recv(int handle,char recv_byte)
 * @return < 0 失败
 * @note     rx_size和tx_size必须是2的x次方
 */
-int serial_create(int *handle,uint32_t rx_size,uint32_t tx_size)
+int serial_create(serial_handle_t *handle,uint8_t *rx_buffer,uint32_t rx_size,uint8_t *tx_buffer,uint32_t tx_size)
 { 
-    char *prx_buffer = NULL,*ptx_buffer = NULL;
-    serial_t *s = NULL;
- 
-    log_assert(handle);
 
-    log_assert(IS_POWER_OF_TWO(rx_size));
-    log_assert(IS_POWER_OF_TWO(tx_size));
-
-    prx_buffer = SERIAL_MALLOC(rx_size);
-    ptx_buffer = SERIAL_MALLOC(tx_size);
-    s = SERIAL_MALLOC(sizeof(serial_t));
-
-    if (s == NULL || prx_buffer == NULL || ptx_buffer == NULL) {
-        goto err_exit;
+    if (!IS_POWER_OF_TWO(rx_size)) {
+        return -1;
     }
 
-    s->recv.buffer = prx_buffer;
-    s->send.buffer = ptx_buffer;
- 
-    s->recv.size = rx_size;
-    s->recv.mask = rx_size - 1;
-    s->send.size = tx_size;
-    s->send.mask = tx_size - 1;
-    s->recv.read = 0;
-    s->recv.write = 0;
- 
-    s->send.read = 0;
-    s->send.write = 0;
-
-    s->driver = NULL;
-    s->registered = false;
-    s->handle = (int)s;
-    *handle = s->handle;
-
-    return 0;
-
-err_exit:
-    if (prx_buffer) {
-        SERIAL_FREE(prx_buffer);
-    }
- 
-    if (ptx_buffer) {
-        SERIAL_FREE(ptx_buffer);
-    }
- 
-    if (s) {
-        SERIAL_FREE(s);
+    if (!IS_POWER_OF_TWO(tx_size)) {
+        return -1;
     }
 
-    return -1;		
+    handle->recv.buffer = rx_buffer;
+    handle->send.buffer = tx_buffer;
+ 
+    handle->recv.size = rx_size;
+    handle->recv.mask = rx_size - 1;
+    handle->send.size = tx_size;
+    handle->send.mask = tx_size - 1;
+    handle->recv.read = 0;
+    handle->recv.write = 0;
+ 
+    handle->send.read = 0;
+    handle->send.write = 0;
+
+    handle->driver = NULL;
+    handle->registered = false;
+
+    return 0;	
 }
 
+
+#if SERIAL_IN_FREERTOS  > 0
+#include "cmsis_os.h"
 /*
-* @brief  串口销毁
+* @brief  串口等待数据
 * @param handle 串口句柄
-* @return = 0 成功
+* @param timeout 超时时间
+* @return < 0 失败
+* @return = 0 等待超时
+* @return > 0 等待的数据量
 * @note 
 */
-int serial_destroy(int handle)
+int serial_select(serial_handle_t *handle,uint32_t timeout)
 {
-    serial_t *s;
- 
-    s = ( serial_t *)handle;
+    int size = 0;
+    utils_timer_t timer;
 
-    if (s->handle != handle){
-        log_error("serial handle:%d invalid.\r\n",handle);
+    if (handle->init == false) {
         return -1;
     } 
-    SERIAL_FREE(s->recv.buffer);
-    SERIAL_FREE(s->send.buffer);
-    SERIAL_FREE(s);
 
-    return 0;
+    utils_timer_init(&timer,timeout,false);
+
+    while (utils_timer_value(&timer) > 0 && size == 0) {
+        size = circle_buffer_used_size(&handle->recv);
+        if (size == 0) {
+            osDelay(1);
+        }
+    } 
+        
+    return size;
 }
 
+
+/*
+* @brief  串口等待数据发送完毕
+* @param handle 串口句柄
+* @param timeout 超时时间
+* @return < 0 失败
+* @return = 0 等待发送超时
+* @return > 0 实际发送的数据量
+* @note 
+*/
+int serial_complete(serial_handle_t *handle,uint32_t timeout)
+{
+    utils_timer_t timer; 
+
+    if (handle->init == false){
+        return -1;
+    } 
+    utils_timer_init(&timer,timeout,false);
+
+    while (utils_timer_value(&timer) > 0 && handle->send_empty == false) {
+        osDelay(1);
+    }
+
+    return circle_buffer_used_size(&handle->send);
+}
+
+#endif
 

@@ -1,7 +1,6 @@
 #include "board.h"
 #include "cmsis_os.h"
 #include "utils.h"
-#include "serial.h"
 #include "firmware_version.h"
 #include "tasks_init.h"
 #include "scale_task.h"
@@ -17,10 +16,13 @@
 osThreadId   communication_task_hdl;
 osMessageQId communication_task_msg_q_id;
 /*通信串口句柄*/
-static int communication_serial_handle;
+static serial_handle_t communication_serial_handle;
+static uint8_t comm_recv_buffer[COMMUNICATION_TASK_RX_BUFFER_SIZE];
+static uint8_t comm_send_buffer[COMMUNICATION_TASK_TX_BUFFER_SIZE];
+
 
 extern serial_hal_driver_t nxp_serial_uart_hal_driver;
-extern void nxp_serial_uart_hal_isr(int handle);
+extern void nxp_serial_uart_hal_isr(serial_handle_t *handle);
 /*通信任务上文实体*/
 static communication_task_contex_t communication_task_contex;
 
@@ -859,7 +861,7 @@ static int process_update(application_update_t *update,uint32_t timeout)
 
     uint32_t size = 0;
     
-    status = Ymodem_Receive(communication_serial_handle,APPLICATION_UPDATE_BASE_ADDR,APPLICATION_SIZE_LIMIT,file_name,&size);
+    status = Ymodem_Receive(&communication_serial_handle,APPLICATION_UPDATE_BASE_ADDR,APPLICATION_SIZE_LIMIT,file_name,&size);
     if (status == COM_OK) {
         if (size != update->size) {
             log_error("file ymodem get size:%d != notify size:%d.\r\n",size,update->size);
@@ -876,7 +878,7 @@ static int process_update(application_update_t *update,uint32_t timeout)
         /*int转换成字符串*/
         snprintf(size_str_buffer,7,"%d",size);
 
-        log_debug("update size:%s md5:%s ok.\r\n",size_str_buffer,md5_str_buffer);
+        log_debug("check update size:%s md5:%s ok.\r\n",size_str_buffer,md5_str_buffer);
 
         /*设置更新size*/
         log_debug("set update size env...\r\n");
@@ -916,7 +918,7 @@ static int process_update(application_update_t *update,uint32_t timeout)
 * @return  > 0 成功接收的数据量
 * @note
 */
-static int receive_adu(int handle,uint8_t *adu,uint8_t size,uint32_t timeout)
+static int receive_adu(serial_handle_t *handle,uint8_t *adu,uint8_t size,uint32_t timeout)
 {
     int rc;
     int read_size,read_size_total = 0;
@@ -1248,7 +1250,7 @@ static int parse_adu(uint8_t *adu,uint8_t size,uint8_t *rsp,application_update_t
 * @return  0 成功 
 * @note
 */
-static int send_adu(int handle,uint8_t *adu,uint8_t size,uint32_t timeout)
+static int send_adu(serial_handle_t *handle,uint8_t *adu,uint8_t size,uint32_t timeout)
 {
     uint8_t write_size;
 
@@ -1315,24 +1317,24 @@ static int get_serial_port_by_addr(uint8_t addr)
 * @note
 */
 
-static int get_serial_handle_by_port(communication_task_contex_t *contex,uint8_t port)
+static serial_handle_t *get_serial_handle_by_port(communication_task_contex_t *contex,uint8_t port)
 {
     if (!contex->initialized) {
-        return -1;
+        return NULL;
     }
     for (uint8_t i = 0;i <contex->cnt;i ++) {
         if (contex->scale_task_contex[i].port == port) {
-            return contex->scale_task_contex[i].handle;
+            return &contex->scale_task_contex[i].handle;
         }
     }
-    return -1;
+    return NULL;
 }
 
 /*控制器任务通信中断处理*/
 void FLEXCOMM0_IRQHandler()
 {
-    if (communication_serial_handle > 0) {
-        nxp_serial_uart_hal_isr(communication_serial_handle);
+    if (communication_serial_handle.registered && communication_serial_handle.init) {
+        nxp_serial_uart_hal_isr(&communication_serial_handle);
     }
 
 }
@@ -1340,10 +1342,10 @@ void FLEXCOMM0_IRQHandler()
 /*电子秤任务通信中断处理*/
 void FLEXCOMM1_IRQHandler()
 {
-    int handle;
+    serial_handle_t *handle;
 
     handle = get_serial_handle_by_port(&communication_task_contex,1);
-    if (handle > 0) {
+    if (handle->registered && handle->init) {
         nxp_serial_uart_hal_isr(handle);
     }
 
@@ -1352,10 +1354,10 @@ void FLEXCOMM1_IRQHandler()
 /*电子秤任务通信中断处理*/
 void FLEXCOMM2_IRQHandler()
 {
-    int handle;
+    serial_handle_t *handle;
 
     handle = get_serial_handle_by_port(&communication_task_contex,2);
-    if (handle > 0) {
+    if (handle->registered && handle->init) {
         nxp_serial_uart_hal_isr(handle);
     }
 
@@ -1364,10 +1366,10 @@ void FLEXCOMM2_IRQHandler()
 /*电子秤任务通信中断处理*/
 void FLEXCOMM3_IRQHandler()
 {
-    int handle;
+    serial_handle_t *handle;
 
     handle = get_serial_handle_by_port(&communication_task_contex,3);
-    if (handle > 0) {
+    if (handle->registered && handle->init) {
         nxp_serial_uart_hal_isr(handle);
     }
 
@@ -1375,10 +1377,10 @@ void FLEXCOMM3_IRQHandler()
 /*电子秤任务通信中断处理*/
 void FLEXCOMM4_IRQHandler()
 {
-    int handle;
+    serial_handle_t *handle;
 
     handle = get_serial_handle_by_port(&communication_task_contex,4);
-    if (handle > 0) {
+    if (handle->registered && handle->init) {
         nxp_serial_uart_hal_isr(handle);
     }
 
@@ -1387,10 +1389,10 @@ void FLEXCOMM4_IRQHandler()
 /*电子秤任务通信中断处理*/
 void FLEXCOMM5_IRQHandler()
 {
-    int handle;
+    serial_handle_t *handle;
 
     handle = get_serial_handle_by_port(&communication_task_contex,5);
-    if (handle > 0) {
+    if (handle->registered && handle->init) {
         nxp_serial_uart_hal_isr(handle);
     }
 
@@ -1399,10 +1401,10 @@ void FLEXCOMM5_IRQHandler()
 /*电子秤任务通信中断处理*/
 void FLEXCOMM6_IRQHandler()
 {
-    int handle;
+    serial_handle_t *handle;
 
     handle = get_serial_handle_by_port(&communication_task_contex,6);
-    if (handle > 0) {
+    if (handle->registered && handle->init) {
         nxp_serial_uart_hal_isr(handle);
     }
 
@@ -1411,10 +1413,10 @@ void FLEXCOMM6_IRQHandler()
 /*电子秤任务通信中断处理*/
 void FLEXCOMM7_IRQHandler()
 {
-    int handle;
+    serial_handle_t *handle;
 
     handle = get_serial_handle_by_port(&communication_task_contex,7);
-    if (handle > 0) {
+    if (handle->registered && handle->init) {
         nxp_serial_uart_hal_isr(handle);
     }
 
@@ -1422,10 +1424,10 @@ void FLEXCOMM7_IRQHandler()
 /*电子秤任务通信中断处理*/
 void FLEXCOMM8_IRQHandler()
 {
-    int handle;
+    serial_handle_t *handle;
 
     handle = get_serial_handle_by_port(&communication_task_contex,8);
-    if (handle > 0) {
+    if (handle->registered && handle->init) {
         nxp_serial_uart_hal_isr(handle);
     }
 
@@ -1457,19 +1459,19 @@ static void communication_task_contex_init(communication_task_contex_t *contex)
         contex->scale_task_contex[i].stop_bits = SCALE_TASK_SERIAL_STOPBITS;
         contex->scale_task_contex[i].flag = 1 << i;
 
-        rc = serial_create(&contex->scale_task_contex[i].handle,SCALE_TASK_RX_BUFFER_SIZE,SCALE_TASK_RX_BUFFER_SIZE);
+        rc = serial_create(&contex->scale_task_contex[i].handle,contex->scale_task_contex[i].recv,SCALE_TASK_RX_BUFFER_SIZE,contex->scale_task_contex[i].send,SCALE_TASK_TX_BUFFER_SIZE);
         log_assert(rc == 0);
-        rc = serial_register_hal_driver(contex->scale_task_contex[i].handle,&nxp_serial_uart_hal_driver);
+        rc = serial_register_hal_driver(&contex->scale_task_contex[i].handle,&nxp_serial_uart_hal_driver);
         log_assert(rc == 0);
  
-        rc = serial_open(contex->scale_task_contex[i].handle,
+        rc = serial_open(&contex->scale_task_contex[i].handle,
                          contex->scale_task_contex[i].port,
                          contex->scale_task_contex[i].baud_rates,
                          contex->scale_task_contex[i].data_bits,
                          contex->scale_task_contex[i].stop_bits);
         log_assert(rc == 0);
         /*清空接收缓存*/
-        serial_flush(contex->scale_task_contex[i].handle);
+        serial_flush(&contex->scale_task_contex[i].handle);
 
         /*创建电子秤消息队列*/
         osMessageQDef(scale_task_msg_queue,1,uint32_t);
@@ -1545,12 +1547,12 @@ void communication_task(void const * argument)
     uint8_t adu_recv[ADU_SIZE_MAX];
     uint8_t adu_send[ADU_SIZE_MAX];
  
-    rc = serial_create(&communication_serial_handle,COMMUNICATION_TASK_RX_BUFFER_SIZE,COMMUNICATION_TASK_TX_BUFFER_SIZE);
+    rc = serial_create(&communication_serial_handle,comm_recv_buffer,COMMUNICATION_TASK_RX_BUFFER_SIZE,comm_send_buffer,COMMUNICATION_TASK_TX_BUFFER_SIZE);
     log_assert(rc == 0);
-    rc = serial_register_hal_driver(communication_serial_handle,&nxp_serial_uart_hal_driver);
+    rc = serial_register_hal_driver(&communication_serial_handle,&nxp_serial_uart_hal_driver);
     log_assert(rc == 0);
  
-    rc = serial_open(communication_serial_handle,
+    rc = serial_open(&communication_serial_handle,
                     COMMUNICATION_TASK_SERIAL_PORT,
                     COMMUNICATION_TASK_SERIAL_BAUDRATES,
                     COMMUNICATION_TASK_SERIAL_DATABITS,
@@ -1564,14 +1566,14 @@ void communication_task(void const * argument)
     update.update = COMMUNICATION_TASK_APPLICATION_NORMAL;
 
     /*清空接收缓存*/
-    serial_flush(communication_serial_handle);
+    serial_flush(&communication_serial_handle);
     while (1) {
 
         /*接收主机发送的adu*/
-        rc = receive_adu(communication_serial_handle,(uint8_t *)adu_recv,ADU_SIZE_MAX,ADU_WAIT_TIMEOUT);
+        rc = receive_adu(&communication_serial_handle,(uint8_t *)adu_recv,ADU_SIZE_MAX,ADU_WAIT_TIMEOUT);
         if (rc < 0) {
             /*清空接收缓存*/
-            serial_flush(communication_serial_handle);
+            serial_flush(&communication_serial_handle);
             continue;
         }
         /*解析处理pdu*/
@@ -1581,7 +1583,7 @@ void communication_task(void const * argument)
             continue;
         }
         /*回应主机处理结果*/
-        rc = send_adu(communication_serial_handle,adu_send,rc,ADU_SEND_TIMEOUT);
+        rc = send_adu(&communication_serial_handle,adu_send,rc,ADU_SEND_TIMEOUT);
         if (rc < 0) {
             continue;
         }

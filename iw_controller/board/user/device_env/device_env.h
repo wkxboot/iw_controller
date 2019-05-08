@@ -9,22 +9,22 @@ extern "C" {
 #define  DEVICE_ENV_USE_BACKUP                 1            /*是否使用环境变量备份*/
 
 #define  BOOTLOADER_BASE_ADDR                  0x00000000UL /*bootloader基地址*/
-#define  BOOTLOADER_SIZE_LIMIT                 0xA000       /*bootloader最大容量*/
+#define  BOOTLOADER_SIZE_LIMIT                 0x8000       /*bootloader最大容量*/
 
-#define  APPLICATION_SIZE_LIMIT                0x19000      /*application最大容量*/
+#define  APPLICATION_SIZE_LIMIT                0x18000      /*application最大容量*/
 
-#define  APPLICATION_BASE_ADDR                 0x0000A000UL /*application基地址*/
+#define  APPLICATION_BASE_ADDR                 0x00008000UL /*application基地址*/
 
-#define  APPLICATION_BACKUP_BASE_ADDR          0x00023000UL /*application备份基地址*/
+#define  APPLICATION_BACKUP_BASE_ADDR          0x00020000UL /*application备份基地址*/
 
-#define  APPLICATION_UPDATE_BASE_ADDR          0x0003C000UL /*application更新基地址*/
+#define  APPLICATION_UPDATE_BASE_ADDR          0x00038000UL /*application更新基地址*/
 
 #define  DEVICE_MIN_ERASE_SIZE                 256          /*最小擦除单元大小 bytes*/
 #define  DEVICE_ADDR_MAP_LIMIT                 0x00080000   /*设备最大地址映射*/    
     
-#define  DEVICE_ENV_BASE_ADDR                  0x00055000   /*环境变量基地址*/   
+#define  DEVICE_ENV_BASE_ADDR                  0x00050000   /*环境变量基地址*/   
 
-#define  DEVICE_ENV_BACKUP_BASE_ADDR           0x00055200   /*环境变量备份基地址*/      
+#define  DEVICE_ENV_BACKUP_BASE_ADDR           0x00050200   /*环境变量备份基地址*/      
      
 #define  DEVICE_ENV_SIZE_LIMIT                 (DEVICE_MIN_ERASE_SIZE * 2)   /*环境变量大小*/ 
 

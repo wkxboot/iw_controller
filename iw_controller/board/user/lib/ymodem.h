@@ -5,6 +5,13 @@
 extern "C" {
 #endif
 
+#include "flash_if.h"
+#include "string.h"
+#include "serial.h"
+#include "utils.h"
+#include "cmsis_os.h"
+#include "log.h"
+
 typedef enum
 {
   COM_OK       = 0x00,
@@ -62,7 +69,7 @@ typedef enum
   * @param  p_size The size of the file.
   * @retval COM_StatusTypeDef result of reception/programming
   */
-COM_StatusTypeDef Ymodem_Receive (int handle,uint32_t flash_addr,uint32_t flash_size,char *file_name, uint32_t *p_size);
+COM_StatusTypeDef Ymodem_Receive (serial_handle_t *handle,uint32_t flash_addr,uint32_t flash_size,char *file_name, uint32_t *p_size);
 /**
   * @brief  Transmit a file using the ymodem protocol
   * @param  p_buf: Address of the first byte
@@ -70,7 +77,7 @@ COM_StatusTypeDef Ymodem_Receive (int handle,uint32_t flash_addr,uint32_t flash_
   * @param  file_size: Size of the transmission
   * @retval COM_StatusTypeDef result of the communication
   */
-COM_StatusTypeDef Ymodem_Transmit (int handle,uint8_t *p_buf, const uint8_t *p_file_name, uint32_t file_size,uint32_t max_size);
+COM_StatusTypeDef Ymodem_Transmit (serial_handle_t *handle,uint8_t *p_buf, const uint8_t *p_file_name, uint32_t file_size,uint32_t max_size);
 
 
 

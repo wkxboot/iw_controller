@@ -1,6 +1,8 @@
 #ifndef  __COMMUNICATION_H__
 #define  __COMMUNICATION_H__
 #include "stdbool.h"
+#include "serial.h"
+#include "scale_task.h"
 
 extern osThreadId   communication_task_hdl;
 extern osMessageQId communication_task_msg_q_id;
@@ -47,7 +49,9 @@ typedef struct
 /*电子秤任务上下文*/
 typedef struct
 {
-    int handle;
+    serial_handle_t handle;
+    uint8_t recv[SCALE_TASK_RX_BUFFER_SIZE];
+    uint8_t send[SCALE_TASK_TX_BUFFER_SIZE];
     uint8_t port;
     uint32_t baud_rates;
     uint8_t data_bits;

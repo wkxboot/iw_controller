@@ -4,6 +4,7 @@
 #include "stdint.h"
 #include "stdbool.h"
 #include "string.h"
+#include "utils.h"
 #include "circle_buffer.h"
 
 #ifdef __IAR_SYSTEMS_ICC__
@@ -19,6 +20,9 @@
 #endif
 
 SERIAL_BEGIN
+
+/*freertos下使用*/
+#define  SERIAL_IN_FREERTOS                         1
 
 #define  SERIAL_PRIORITY_BITS                       3
 #define  SERIAL_PRIORITY_HIGH                       2
@@ -38,19 +42,18 @@ typedef struct
 
 typedef struct
 {
-    int                 handle;
     uint8_t             port;
     uint32_t            baud_rates;
     uint8_t             data_bits;
     uint8_t             stop_bits;
     bool                registered;
     bool                init;
-    bool                full;
-    bool                empty;
+    bool                recv_full;
+    bool                send_empty;
     serial_hal_driver_t *driver;
     circle_buffer_t     recv;
     circle_buffer_t     send;
-}serial_t;
+}serial_handle_t;
 
 /*
 * @brief  从串口非阻塞的读取指定数量的数据
@@ -61,7 +64,7 @@ typedef struct
 * @return >= 0 实际读取的数量
 * @note 可重入
 */
-int serial_read(int handle,char *dst,int size);
+int serial_read(serial_handle_t *handle,char *dst,int size);
 
 
 /*
@@ -73,7 +76,7 @@ int serial_read(int handle,char *dst,int size);
 * @return >= 0 实际写入的数量
 * @note 可重入
 */
-int serial_write(int handle,const char *src,int size);
+int serial_write(serial_handle_t *handle,const char *src,int size);
 
 /*
 * @brief  串口刷新
@@ -82,7 +85,7 @@ int serial_write(int handle,const char *src,int size);
 * @return >=0 刷新的接收缓存数量
 * @note 
 */
-int serial_flush(int handle);
+int serial_flush(serial_handle_t *handle);
 
 /*
 * @brief  打开串口
@@ -91,7 +94,7 @@ int serial_flush(int handle);
 * @return = 0 成功
 * @note 
 */
-int serial_open(int handle,uint8_t port,uint32_t baud_rates,uint8_t data_bits,uint8_t stop_bits);
+int serial_open(serial_handle_t *handle,uint8_t port,uint32_t baud_rates,uint8_t data_bits,uint8_t stop_bits);
 
 /*
 * @brief  关闭串口
@@ -100,29 +103,7 @@ int serial_open(int handle,uint8_t port,uint32_t baud_rates,uint8_t data_bits,ui
 * @return = 0 成功
 * @note 
 */
-int serial_close(int handle);
-
-/*
-* @brief  串口等待数据
-* @param handle 串口句柄
-* @param timeout 超时时间
-* @return < 0 失败
-* @return = 0 等待超时
-* @return > 0 等待的数据量
-* @note 
-*/
-int serial_select(int handle,uint32_t timeout);
-
-/*
-* @brief  串口等待数据发送完毕
-* @param handle 串口句柄
-* @param timeout 超时时间
-* @return < 0 失败
-* @return = 0 等待发送超时
-* @return > 0 实际发送的数据量
-* @note 
-*/
-int serial_complete(int handle,uint32_t timeout);
+int serial_close(serial_handle_t *handle);
 
 /*
 * @brief  串口注册硬件驱动
@@ -132,7 +113,7 @@ int serial_complete(int handle,uint32_t timeout);
 * @return = 0 成功
 * @note 
 */
-int serial_register_hal_driver(int handle,serial_hal_driver_t *driver);
+int serial_register_hal_driver(serial_handle_t *handle,serial_hal_driver_t *driver);
 
 /*
 * @brief  串口中断发送routine
@@ -142,7 +123,7 @@ int serial_register_hal_driver(int handle,serial_hal_driver_t *driver);
 * @return = 0 成功
 * @note 
 */
-int isr_serial_get_byte_to_send(int handle,char *byte_send);
+int isr_serial_get_byte_to_send(serial_handle_t *handle,char *byte_send);
 
 /*
 * @brief  串口中断接收routine
@@ -152,7 +133,7 @@ int isr_serial_get_byte_to_send(int handle,char *byte_send);
 * @return = 0 成功
 * @note 
 */
-int isr_serial_put_byte_from_recv(int handle,char recv_byte);
+int isr_serial_put_byte_from_recv(serial_handle_t *handle,char recv_byte);
 
 /*
 * @brief  串口创建
@@ -163,17 +144,31 @@ int isr_serial_put_byte_from_recv(int handle,char recv_byte);
 * @return < 0 失败
 * @note     rx_size和tx_size必须是2的x次方
 */
-int serial_create(int *handle,uint32_t rx_size,uint32_t tx_size);
+int serial_create(serial_handle_t *handle,uint8_t *rx_buffer,uint32_t rx_size,uint8_t *tx_buffer,uint32_t tx_size);
 
+#if SERIAL_IN_FREERTOS > 0
 /*
-* @brief  串口销毁
+* @brief  串口等待数据
 * @param handle 串口句柄
-* @return = 0 成功
+* @param timeout 超时时间
+* @return < 0 失败
+* @return = 0 等待超时
+* @return > 0 等待的数据量
 * @note 
 */
-int serial_destroy(int handle);
+int serial_select(serial_handle_t *handle,uint32_t timeout);
 
-
+/*
+* @brief  串口等待数据发送完毕
+* @param handle 串口句柄
+* @param timeout 超时时间
+* @return < 0 失败
+* @return = 0 等待发送超时
+* @return > 0 实际发送的数据量
+* @note 
+*/
+int serial_complete(serial_handle_t *handle,uint32_t timeout);
+#endif
 
 
 

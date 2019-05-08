@@ -31,6 +31,7 @@ typedef struct
     uint8_t  data_region[DEVICE_ENV_DATA_SIZE_LIMIT];
 }device_env_t;
 
+/*内部静态环境变量*/
 static device_env_t device_env;
 
 /*

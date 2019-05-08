@@ -1,10 +1,5 @@
-#include "flash_if.h"
 #include "ymodem.h"
-#include "string.h"
-#include "serial.h"
-#include "utils.h"
-#include "cmsis_os.h"
-#include "log.h"
+
 
 
 #define CRC16_F       /* activate the CRC16 integrity */
@@ -14,7 +9,7 @@ uint8_t aPacketData[PACKET_1K_SIZE + PACKET_DATA_INDEX + PACKET_TRAILER_SIZE];
 
 static void PrepareIntialPacket(uint8_t *p_data, const uint8_t *p_file_name, uint32_t length);
 static void PreparePacket(uint8_t *p_source, uint8_t *p_packet, uint8_t pkt_nr, uint32_t size_blk);
-static int ReceivePacket(int handle,uint8_t *p_data, uint32_t *p_length, uint32_t timeout);
+static int ReceivePacket(serial_handle_t *handle,uint8_t *p_data, uint32_t *p_length, uint32_t timeout);
 uint16_t UpdateCRC16(uint16_t crc_in, uint8_t byte);
 uint16_t Cal_CRC16(const uint8_t* p_data, uint32_t size);
 uint8_t CalcChecksum(const uint8_t *p_data, uint32_t size);
@@ -27,27 +22,35 @@ uint8_t CalcChecksum(const uint8_t *p_data, uint32_t size);
 * @return 
 * @note
 */
-static int port_ymodem_recv(int handle,uint8_t *dst,uint32_t size,uint32_t timeout)
+static int port_ymodem_recv(serial_handle_t *handle,uint8_t *dst,uint32_t size,uint32_t timeout)
 {
     int rc;
+    int read_total = 0,read_left = size;
     utils_timer_t timer;
-
+    
     utils_timer_init(&timer,timeout,false);
 
-    while (utils_timer_value(&timer) > 0) {
+    while (utils_timer_value(&timer) > 0 && read_left > 0) {
         rc = serial_select(handle,utils_timer_value(&timer));
         if (rc == 0) {
             log_error("ymodem select timeout.\r\n");
             return -1;
         }
-        if (rc >= size) {
-            break;
+        if (rc < 0) {
+            log_error("ymodem select err.\r\n");
+            return -1;
         }
+
+        rc = serial_read(handle,(char*)dst,read_left);
+        if (rc < 0) {
+            log_error("ymodem read err.\r\n");
+            return -1;
+        }
+        read_total += rc;
+        read_left -= rc;
     }
 
-    rc = serial_read(handle,(char*)dst,size);
-    if (rc != size) {
-        log_error("ymodem read err.\r\n");
+    if (read_left > 0) {
         return -1;
     }
 
@@ -61,7 +64,7 @@ static int port_ymodem_recv(int handle,uint8_t *dst,uint32_t size,uint32_t timeo
 * @return 
 * @note
 */
-static int port_ymodem_send(int handle,uint8_t *src,uint32_t size,uint32_t timeout)
+static int port_ymodem_send(serial_handle_t *handle,uint8_t *src,uint32_t size,uint32_t timeout)
 {
     int rc;
 
@@ -85,7 +88,7 @@ static int port_ymodem_send(int handle,uint8_t *src,uint32_t size,uint32_t timeo
 * @return 0：成功 -1：失败
 * @note
 */
-static int Serial_PutByte(int handle,char src)
+static int Serial_PutByte(serial_handle_t *handle,char src)
 {
     uint8_t send = src;
 
@@ -102,7 +105,7 @@ static int Serial_PutByte(int handle,char src)
   * @retval 0: normally return
   *         -1: abort by user
   */
-static int ReceivePacket(int handle,uint8_t *p_data, uint32_t *p_length, uint32_t timeout)
+static int ReceivePacket(serial_handle_t *handle,uint8_t *p_data, uint32_t *p_length, uint32_t timeout)
 {
   uint32_t crc;
   uint32_t packet_size = 0;
@@ -332,7 +335,7 @@ uint8_t CalcChecksum(const uint8_t *p_data, uint32_t size)
   * @param  p_size The size of the file.
   * @retval COM_StatusTypeDef result of reception/programming
   */
-COM_StatusTypeDef Ymodem_Receive (int handle,uint32_t flash_addr,uint32_t flash_size,char *file_name, uint32_t *p_size )
+COM_StatusTypeDef Ymodem_Receive (serial_handle_t *handle,uint32_t flash_addr,uint32_t flash_size,char *file_name, uint32_t *p_size )
 {
   uint32_t i, packet_length, session_done = 0, file_done, errors = 0, session_begin = 0;
   uint32_t flashdestination, ramsource, filesize;
@@ -408,7 +411,7 @@ COM_StatusTypeDef Ymodem_Receive (int handle,uint32_t flash_addr,uint32_t flash_
                       result = COM_LIMIT;
                     }
                     /* erase user application area */
-                    flash_if_erase_sector(flash_addr,flash_size);
+                    flash_if_erase(flash_addr,flash_size);
                     *p_size = filesize;
 
                     Serial_PutByte(handle,ACK);
@@ -481,7 +484,7 @@ COM_StatusTypeDef Ymodem_Receive (int handle,uint32_t flash_addr,uint32_t flash_
   * @param  file_size: Size of the transmission
   * @retval COM_StatusTypeDef result of the communication
   */
-COM_StatusTypeDef Ymodem_Transmit (int handle,uint8_t *p_buf, const uint8_t *p_file_name, uint32_t file_size,uint32_t max_size)
+COM_StatusTypeDef Ymodem_Transmit (serial_handle_t *handle,uint8_t *p_buf, const uint8_t *p_file_name, uint32_t file_size,uint32_t max_size)
 {
   uint32_t errors = 0, ack_recpt = 0, size = 0, pkt_size;
   uint8_t *p_buf_int;

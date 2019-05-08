@@ -1,13 +1,14 @@
 #ifndef  __NV_FLASH_H__
 #define  __NV_FLASH_H__
 #include "stdint.h"
-
+#include "fsl_flashiap.h"
 
 #ifdef __cplusplus
     extern "C" {
 #endif
 
-
+#define  FLASH_PAGE_SIZE                          FSL_FEATURE_SYSCON_FLASH_PAGE_SIZE_BYTES
+#define  FLASH_SECTOR_SIZE                        FSL_FEATURE_SYSCON_FLASH_SECTOR_SIZE_BYTES             
 #define  NV_FLASH_PRIORITY_BITS                   3
 #define  NV_FLASH_PRIORITY_HIGH                   2  
 
@@ -39,15 +40,6 @@ int flash_if_read(uint32_t addr,uint8_t *dst,uint32_t size);
 * @note
 */
 int flash_if_erase(uint32_t addr,uint32_t size);
-
-/*
-* @brief 扇区擦除指定地址数据
-* @param addr 擦除开始地址
-* @param size 擦除数据量
-* @return 0：成功 -1：失败
-* @note
-*/
-int flash_if_erase_sector(uint32_t addr,uint32_t size);
 
 /*
 * @brief flash_if_write 数据编程写入

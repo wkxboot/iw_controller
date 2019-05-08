@@ -265,14 +265,14 @@ void nxp_serial_uart_hal_disable_rxne_it(uint8_t port)
 * @return 无
 * @note
 */
-void nxp_serial_uart_hal_isr(int handle)
+void nxp_serial_uart_hal_isr(serial_handle_t *handle)
 {
     int result;
     uint32_t tmp_flag = 0, tmp_it_source = 0; 
     char  send_byte,recv_byte;
     USART_Type *nxp_uart_handle; 
 
-    nxp_uart_handle = nxp_serial_uart_search_handle_by_port(((serial_t *)handle)->port);
+    nxp_uart_handle = nxp_serial_uart_search_handle_by_port(handle->port);
 
     tmp_flag = USART_GetEnabledInterrupts(nxp_uart_handle);
     tmp_it_source = USART_GetStatusFlags(nxp_uart_handle);

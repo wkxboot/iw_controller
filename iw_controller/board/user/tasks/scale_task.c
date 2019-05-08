@@ -182,7 +182,7 @@ static int build_adu(uint8_t *adu,uint8_t addr,uint8_t code,uint8_t *value,uint8
 * @return 
 * @note
 */
-static int send_adu(const int handle,const uint8_t *adu,const uint8_t size,const uint16_t timeout)
+static int send_adu(serial_handle_t *handle,const uint8_t *adu,const uint8_t size,const uint16_t timeout)
 {
     uint16_t write_size,write_size_total;
  
@@ -208,7 +208,7 @@ static int send_adu(const int handle,const uint8_t *adu,const uint8_t size,const
 * @return  0 成功
 * @note
 */
-static int receive_adu(const int handle,uint8_t *adu,uint32_t wait_timeout)
+static int receive_adu(serial_handle_t *handle,uint8_t *adu,uint32_t wait_timeout)
 {
     int rc;
     int read_size,read_size_total = 0;
@@ -374,7 +374,7 @@ static int parse_pdu(const uint8_t *pdu,int size,const uint8_t addr,const uint8_
 * @return -1 失败
 * @note
 */
-static int scale_task_poll(int handle,uint8_t addr,uint8_t code,uint8_t *value,uint8_t size,uint8_t *rsp)
+static int scale_task_poll(serial_handle_t *handle,uint8_t addr,uint8_t code,uint8_t *value,uint8_t size,uint8_t *rsp)
 {
     int rc ;
     uint8_t adu_send[ADU_SIZE_MAX];
@@ -433,7 +433,7 @@ void scale_task(void const *argument)
  
             /*获取净重值*/
             if (req_msg.request.type == SCALE_TASK_MSG_TYPE_NET_WEIGHT) { 
-                rc = scale_task_poll(task_contex->handle,task_contex->phy_addr,PDU_CODE_NET_WEIGHT,req_value,0,rsp_value);
+                rc = scale_task_poll(&task_contex->handle,task_contex->phy_addr,PDU_CODE_NET_WEIGHT,req_value,0,rsp_value);
                 if (rc < 0) {
                     net_weight_msg.response.weight = SCALE_TASK_NET_WEIGHT_ERR_VALUE;
                     log_error("scale:%d poll net weight err.\r\n",task_contex->internal_addr);
@@ -456,7 +456,7 @@ void scale_task(void const *argument)
 
             /*去除皮重*/
             if (req_msg.request.type == SCALE_TASK_MSG_TYPE_REMOVE_TARE_WEIGHT) { 
-                rc = scale_task_poll(task_contex->handle,task_contex->phy_addr,PDU_CODE_REMOVE_TARE_WEIGHT,req_value,0,rsp_value);
+                rc = scale_task_poll(&task_contex->handle,task_contex->phy_addr,PDU_CODE_REMOVE_TARE_WEIGHT,req_value,0,rsp_value);
                 if (rc < 0) {
                     remove_tare_msg.response.result = SCALE_TASK_FAIL;
                     log_error("scale:%d poll remove tare weight err.\r\n",task_contex->internal_addr);
@@ -477,7 +477,7 @@ void scale_task(void const *argument)
             if (req_msg.request.type == SCALE_TASK_MSG_TYPE_CALIBRATION_ZERO_WEIGHT) { 
                 req_value[0] = req_msg.request.weight & 0xFF;
                 req_value[1] = req_msg.request.weight >> 8;
-                rc = scale_task_poll(task_contex->handle,task_contex->phy_addr,PDU_CODE_CALIBRATION_ZERO,req_value,2,rsp_value);
+                rc = scale_task_poll(&task_contex->handle,task_contex->phy_addr,PDU_CODE_CALIBRATION_ZERO,req_value,2,rsp_value);
                 if (rc < 0) {
                     calibration_zero_msg.response.result = SCALE_TASK_FAIL;
                     log_error("scale:%d poll calibration zero weight err.\r\n",task_contex->internal_addr);
@@ -498,7 +498,7 @@ void scale_task(void const *argument)
             if (req_msg.request.type == SCALE_TASK_MSG_TYPE_CALIBRATION_FULL_WEIGHT) { 
                 req_value[0] = req_msg.request.weight & 0xFF;
                 req_value[1] = req_msg.request.weight >> 8;
-                rc = scale_task_poll(task_contex->handle,task_contex->phy_addr,PDU_CODE_CALIBRATION_FULL,req_value,2,rsp_value);
+                rc = scale_task_poll(&task_contex->handle,task_contex->phy_addr,PDU_CODE_CALIBRATION_FULL,req_value,2,rsp_value);
                 if (rc < 0) {
                     calibration_full_msg.response.result = SCALE_TASK_FAIL;
                     log_error("scale:%d poll calibration full weight err.\r\n",task_contex->internal_addr);

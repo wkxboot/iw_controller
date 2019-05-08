@@ -1,4 +1,3 @@
-#include "fsl_flashiap.h"
 #include "flash_if.h"
 #include "log.h"
 
@@ -11,7 +10,7 @@
 */
 static uint32_t flash_if_get_sector(uint32_t addr)
 {
-    return (addr / FSL_FEATURE_SYSCON_FLASH_SECTOR_SIZE_BYTES);
+    return (addr / FLASH_SECTOR_SIZE);
 }
 
 /*
@@ -22,7 +21,7 @@ static uint32_t flash_if_get_sector(uint32_t addr)
 */
 static uint32_t flash_if_get_page(uint32_t addr)
 {
-    return  (addr / FSL_FEATURE_SYSCON_FLASH_PAGE_SIZE_BYTES);
+    return  (addr / FLASH_PAGE_SIZE);
 }
 
 
@@ -74,12 +73,10 @@ int flash_if_erase(uint32_t addr,uint32_t size)
     start_page = flash_if_get_page(addr);
     end_page = flash_if_get_page(addr + size - 1);
 
-
-
     start_sector = flash_if_get_sector(addr);
     end_sector = flash_if_get_sector(addr + size - 1);
 
-    log_debug("erase sector from %d to %d or page from %d to %d.size:%d bytes\r\n",start_sector,end_sector,start_page,end_page,size);
+    log_debug("prepare erase...\r\n");
 
     NV_FLASH_ENTER_CRITICAL();
     status = FLASHIAP_PrepareSectorForWrite(start_sector,end_sector);
@@ -90,7 +87,14 @@ int flash_if_erase(uint32_t addr,uint32_t size)
     }
 
     NV_FLASH_ENTER_CRITICAL();
-    status = FLASHIAP_ErasePage(start_page,end_page,SystemCoreClock);
+    /*如果是跨扇区删除，使用扇区删除，否则使用页删除*/
+    if (end_sector > start_sector) {
+        log_debug("erase sector from %d to %d.\r\n",start_sector,end_sector);
+        status = FLASHIAP_EraseSector(start_sector,end_sector,SystemCoreClock);
+    } else {
+        log_debug("erase page from %d to %d.\r\n",start_page,end_page);
+        status = FLASHIAP_ErasePage(start_page,end_page,SystemCoreClock);
+    }
     NV_FLASH_EXIT_CRITICAL();
 
     if (status != kStatus_Success) {
@@ -98,48 +102,11 @@ int flash_if_erase(uint32_t addr,uint32_t size)
         return -1;
     }
 
-    log_debug("erase pages done.\r\n");
+    log_debug("erase done.\r\n");
     return 0;
 }
 
-/*
-* @brief 扇区擦除指定地址数据
-* @param addr 擦除开始地址
-* @param size 擦除数据量
-* @return 0：成功 -1：失败
-* @note
-*/
-int flash_if_erase_sector(uint32_t addr,uint32_t size) 
-{
-    status_t status;
 
-    uint32_t start_sector,end_sector;
-
-    start_sector = flash_if_get_sector(addr);
-    end_sector = flash_if_get_sector(addr + size - 1);
-
-    log_debug("erase sector from %d to %d.size:%d bytes\r\n",start_sector,end_sector,size);
-
-    NV_FLASH_ENTER_CRITICAL();
-    status = FLASHIAP_PrepareSectorForWrite(start_sector,end_sector);
-    NV_FLASH_EXIT_CRITICAL();
-    if (status != kStatus_Success) {
-        log_error("prepare status:%d err.\r\n",status);
-        return -1;
-    }
-
-    NV_FLASH_ENTER_CRITICAL();
-    status = FLASHIAP_EraseSector(start_sector,end_sector,SystemCoreClock);
-    NV_FLASH_EXIT_CRITICAL();
-
-    if (status != kStatus_Success) {
-        log_error("erase status:%d err.\r\n",status);
-        return -1;
-    }
-    log_debug("erase sectors done.\r\n");
-    return 0;
-
-}
 /*
 * @brief flash_if_write 数据编程写入
 * @param addr 地址
@@ -163,7 +130,7 @@ int flash_if_write(uint32_t addr,uint8_t *src,uint32_t size)
     start_sector = flash_if_get_sector(addr);
     end_sector = flash_if_get_sector(addr + size - 1);
 
-    log_debug("write sector from %d to %d or page from %d to %d.size:%d bytes.\r\n",start_sector,end_sector,start_page,end_page,size);
+    log_debug("prepare write...\r\n");
 
     NV_FLASH_ENTER_CRITICAL();
     status = FLASHIAP_PrepareSectorForWrite(start_sector,end_sector);
@@ -172,6 +139,7 @@ int flash_if_write(uint32_t addr,uint8_t *src,uint32_t size)
         log_error("prepare status:%d err.\r\n",status);
         return -1;
     }
+    log_debug("write sector from %d to %d or page from %d to %d.size:%d bytes.\r\n",start_sector,end_sector,start_page,end_page,size);
 
     NV_FLASH_ENTER_CRITICAL();
     status = FLASHIAP_CopyRamToFlash(addr,(uint32_t*)src,size,SystemCoreClock);
