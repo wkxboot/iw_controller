@@ -853,16 +853,19 @@ static int query_software_version(communication_task_contex_t *contex,uint32_t *
 
 static int process_update(application_update_t *update,uint32_t timeout)
 {
+#define  SIZE_STR_BUFFER               7
     COM_StatusTypeDef status;
-    char file_name[100];
+
+    char file_name[FILE_NAME_LENGTH + 1];
     char md5_value[16];
     char md5_str_buffer[33];
-    char size_str_buffer[7];
+    char size_str_buffer[SIZE_STR_BUFFER];
 
     uint32_t size = 0;
     
     status = Ymodem_Receive(&communication_serial_handle,APPLICATION_UPDATE_BASE_ADDR,APPLICATION_SIZE_LIMIT,file_name,&size);
     if (status == COM_OK) {
+        log_debug("update file_name:%s.\r\n",file_name);
         if (size != update->size) {
             log_error("file ymodem get size:%d != notify size:%d.\r\n",size,update->size);
             return -1;
@@ -876,7 +879,7 @@ static int process_update(application_update_t *update,uint32_t timeout)
             return -1;
         }
         /*int转换成字符串*/
-        snprintf(size_str_buffer,7,"%d",size);
+        snprintf(size_str_buffer,SIZE_STR_BUFFER,"%d",size);
 
         log_debug("check update size:%s md5:%s ok.\r\n",size_str_buffer,md5_str_buffer);
 
@@ -1207,11 +1210,10 @@ static int parse_adu(uint8_t *adu,uint8_t size,uint8_t *rsp,application_update_t
 
         case CODE_NOTIFY_UPDATE:/*通知升级信息*/
             if (size != ADU_DATA_REGION_NOTIFY_UPDATE_SIZE) {
-                log_error("query manafacture data size:%d != %d err.\r\n",size,ADU_DATA_REGION_NOTIFY_UPDATE_SIZE);
+                log_error("notify update data size:%d != %d err.\r\n",size,ADU_DATA_REGION_NOTIFY_UPDATE_SIZE);
                 return -1;
             }
             log_debug("notify update...\r\n");
-
             
             /*复制文件长度*/
             update->size = 0;
@@ -1219,6 +1221,11 @@ static int parse_adu(uint8_t *adu,uint8_t size,uint8_t *rsp,application_update_t
             update->size |= (uint32_t)adu[ADU_DATA_REGION_OFFSET + DATA_REGION_FILE_SIZE_OFFSET + 1] << 16;
             update->size |= (uint32_t)adu[ADU_DATA_REGION_OFFSET + DATA_REGION_FILE_SIZE_OFFSET + 2] << 8;
             update->size |= (uint32_t)adu[ADU_DATA_REGION_OFFSET + DATA_REGION_FILE_SIZE_OFFSET + 3] << 0;
+
+            if (update->size > APPLICATION_SIZE_LIMIT) {
+                log_error("notify update file size:%d > limit size %d err.\r\n",update->size,APPLICATION_SIZE_LIMIT);
+                return -1; 
+            }
             /*复制MD5*/
             for (uint8_t i = 0;i < 16 ;i ++) {
                 update->md5[i] = adu[ADU_DATA_REGION_OFFSET + DATA_REGION_FILE_MD5_OFFSET + i];
