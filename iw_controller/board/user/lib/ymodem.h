@@ -69,7 +69,7 @@ typedef enum
   * @param  p_size The size of the file.
   * @retval COM_StatusTypeDef result of reception/programming
   */
-COM_StatusTypeDef Ymodem_Receive (serial_handle_t *handle,uint32_t flash_addr,uint32_t flash_size,char *file_name, uint32_t *p_size);
+COM_StatusTypeDef Ymodem_Receive (serial_handle_t *handle,uint32_t flash_addr,uint32_t flash_size,char *file_name, uint32_t *p_size,uint32_t timeout);
 /**
   * @brief  Transmit a file using the ymodem protocol
   * @param  p_buf: Address of the first byte

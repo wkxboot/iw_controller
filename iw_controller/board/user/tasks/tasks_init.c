@@ -83,7 +83,7 @@ void tasks_init(void)
     log_assert(communication_task_hdl);
 
 
-    log_info("firmware version: %s.\r\n",FIRMWARE_VERSION_STR);
+    log_info("iw controller firmware version: %s.\r\n",FIRMWARE_VERSION_STR);
 
 }
 

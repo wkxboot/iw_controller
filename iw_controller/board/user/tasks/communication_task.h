@@ -23,13 +23,17 @@ void communication_task(void const * argument);
 
 
 
-
+/*电子秤数量和默认地址*/
 #define  SCALE_CNT_MAX                                  8
 #define  COMMUNICATION_TASK_SCALE_DEFAULT_ADDR          1
 
-#define  COMMUNICATION_TASK_UPDATE_TIMEOUT              20000
+/*等待接收升级文件超时时间*/
+#define  COMMUNICATION_TASK_UPDATE_TIMEOUT              (20 * 1000)
+
+/*是否升级标志*/
 #define  COMMUNICATION_TASK_APPLICATION_UPDATE          0x11223344
-#define  COMMUNICATION_TASK_APPLICATION_NORMAL          0
+#define  COMMUNICATION_TASK_APPLICATION_NORMAL          0x12341234
+
 
 typedef struct
 {

@@ -31,7 +31,8 @@ typedef struct
     }hole_sensor;
     struct
     {
-    uint32_t unlock_time;
+    uint8_t status;
+    uint32_t hold_on_time;
     bool manual_unlock;
     }manual_switch;
 }lock_controller_t;
@@ -132,36 +133,40 @@ static void lock_controller_timer_expired(void const *argument)
 
     /*手动按键状态轮询*/
     status = bsp_unlock_sw_status();
-    if (status == BSP_UNLOCK_SW_STATUS_PRESS) {
-        if (lock_controller.manual_switch.manual_unlock == false) {
-            lock_controller.manual_switch.manual_unlock = true;
-            /*检测到手动开门*/
-            req_msg.request.type = LOCK_TASK_MSG_TYPE_MANUAL_UNLOCK_LOCK;
-            os_status = osMessagePut(lock_task_msg_q_id,(uint32_t)&req_msg,0);
-            if (os_status != osOK) {
-                log_error("put manual unlock msg err:%d.\r\n",status);
-            }
-        } else {
-            /*如果一直按着就重新计时*/
-            lock_controller.manual_switch.unlock_time = 0;
-        }
-    }
-    if (lock_controller.manual_switch.manual_unlock == true) {
-        lock_controller.manual_switch.unlock_time += LOCK_TASK_LOCK_CONTROLLER_TIMER_TIMEOUT;
-        if (lock_controller.manual_switch.unlock_time >= LOCK_TASK_MANUAL_UNLOCK_TIME) {
-            lock_controller.manual_switch.unlock_time = 0;
-            lock_controller.manual_switch.manual_unlock = false;
-            /*主动关门*/
-            req_msg.request.type = LOCK_TASK_MSG_TYPE_MANUAL_LOCK_LOCK;
-            os_status = osMessagePut(lock_task_msg_q_id,(uint32_t)&req_msg,0);
-            if (os_status != osOK) {
-                log_error("put manual lock msg err:%d.\r\n",status);
-            }
-        }
-    }
+    if (status != lock_controller.manual_switch.status) {
+        lock_controller.manual_switch.hold_on_time += LOCK_TASK_LOCK_CONTROLLER_TIMER_TIMEOUT;
+        if (lock_controller.manual_switch.hold_on_time >= LOCK_TASK_STATUS_HOLD_ON_TIME) {
+            lock_controller.manual_switch.hold_on_time = 0;
+            lock_controller.manual_switch.status = status;
 
-       
+            if (status == BSP_UNLOCK_SW_STATUS_PRESS) {
+                if (lock_controller.manual_switch.manual_unlock == false) {
+                    lock_controller.manual_switch.manual_unlock = true;
+        
+                    /*检测到手动开门*/
+                    req_msg.request.type = LOCK_TASK_MSG_TYPE_MANUAL_UNLOCK_LOCK;
+                    os_status = osMessagePut(lock_task_msg_q_id,(uint32_t)&req_msg,0);
+                    if (os_status != osOK) {
+                        log_error("put manual unlock msg err:%d.\r\n",status);
+                    }
+                }
+            } else {
+                if (lock_controller.manual_switch.manual_unlock == true) {
+                    lock_controller.manual_switch.manual_unlock = false;
+                    /*检测到松手关门*/
+                    req_msg.request.type = LOCK_TASK_MSG_TYPE_MANUAL_LOCK_LOCK;
+                    os_status = osMessagePut(lock_task_msg_q_id,(uint32_t)&req_msg,0);
+                    if (os_status != osOK) {
+                        log_error("put manual lock msg err:%d.\r\n",status);
+                    }
+                }
+            }
 
+         }
+    } else {
+        lock_controller.manual_switch.hold_on_time = 0;
+    }
+    
 }
 
 /*
@@ -248,11 +253,13 @@ void lock_task(void const *argument)
             } 
         }
  
-        /*上锁*/
+        /*关锁*/
         if (req_msg.request.type == LOCK_TASK_MSG_TYPE_LOCK_LOCK){ 
             log_debug("lock lock...\r\n");
-            /*执行上锁操作*/
-            bsp_lock_ctrl_close();
+            /*只有在没手动开门的情况下，才执行关锁操作*/
+            if (lock_controller.manual_switch.manual_unlock == false) {
+                bsp_lock_ctrl_close();
+            }
 
             utils_timer_init(&timer,LOCK_TASK_LOCK_TIMEOUT,false);
 

@@ -103,7 +103,7 @@ static communication_task_contex_t communication_task_contex;
 #define  ADU_WAIT_TIMEOUT                           osWaitForever
 #define  ADU_FRAME_TIMEOUT                          3
 #define  ADU_RSP_TIMEOUT                            25
-#define  ADU_LOCK_RSP_TIMEOUT                       600
+#define  ADU_LOCK_RSP_TIMEOUT                       850
 #define  ADU_SCALE_CNT_MAX                          20
 #define  ADU_SEND_TIMEOUT                           5
 
@@ -863,7 +863,7 @@ static int process_update(application_update_t *update,uint32_t timeout)
 
     uint32_t size = 0;
     
-    status = Ymodem_Receive(&communication_serial_handle,APPLICATION_UPDATE_BASE_ADDR,APPLICATION_SIZE_LIMIT,file_name,&size);
+    status = Ymodem_Receive(&communication_serial_handle,APPLICATION_UPDATE_BASE_ADDR,APPLICATION_SIZE_LIMIT,file_name,&size,timeout);
     if (status == COM_OK) {
         log_debug("update file_name:%s.\r\n",file_name);
         if (size != update->size) {
@@ -905,7 +905,7 @@ static int process_update(application_update_t *update,uint32_t timeout)
         hal_delay();
         __NVIC_SystemReset();
     } else {
-        log_error("ymodem recv err:%d.\r\n",status);
+        log_error("ymodem recv update file err status:%d.\r\n",status);
         return -1;
     }
 

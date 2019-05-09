@@ -335,9 +335,9 @@ uint8_t CalcChecksum(const uint8_t *p_data, uint32_t size)
   * @param  p_size The size of the file.
   * @retval COM_StatusTypeDef result of reception/programming
   */
-COM_StatusTypeDef Ymodem_Receive (serial_handle_t *handle,uint32_t flash_addr,uint32_t flash_size,char *file_name, uint32_t *p_size )
+COM_StatusTypeDef Ymodem_Receive (serial_handle_t *handle,uint32_t flash_addr,uint32_t flash_size,char *file_name, uint32_t *p_size,uint32_t timeout)
 {
-  uint32_t i, packet_length, session_done = 0, file_done, errors = 0, session_begin = 0;
+  uint32_t i, packet_length, session_done = 0, file_done, wait_timeout = 0,errors = 0, session_begin = 0;
   uint32_t flashdestination, ramsource, filesize;
   uint8_t *file_ptr;
   uint8_t file_size[FILE_SIZE_LENGTH], tmp, packets_received;
@@ -459,12 +459,16 @@ COM_StatusTypeDef Ymodem_Receive (serial_handle_t *handle,uint32_t flash_addr,ui
           if (session_begin > 0)
           {
             errors ++;
+          } else {
+            /*传输开始前的等待超时*/
+            wait_timeout += DOWNLOAD_TIMEOUT;
           }
-          if (errors > MAX_ERRORS)
+          if (wait_timeout >= timeout || errors > MAX_ERRORS)
           {
             /* Abort communication */
             Serial_PutByte(handle,CA);
             Serial_PutByte(handle,CA);
+            result = COM_TIMEOUT;
           }
           else
           {
