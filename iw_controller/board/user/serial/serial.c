@@ -49,6 +49,30 @@ int serial_read(serial_handle_t *handle,char *dst,int size)
 }
 
 /*
+* @brief 串口输出缓存可用空间
+* @param handle 串口句柄
+* @param 
+* @param 
+* @return < 0 错误
+* @return >= 0 可写入的数量
+* @note 可重入
+*/
+int serial_writeable(serial_handle_t *handle)
+{
+    int free_size;
+
+    if (handle->init == false){
+        return -1;
+    }
+
+    SERIAL_ENTER_CRITICAL();
+    free_size = circle_buffer_free_size(&handle->send);
+    SERIAL_EXIT_CRITICAL();
+
+    return free_size;
+}
+
+/*
 * @brief  从串口非阻塞的写入指定数量的数据
 * @param handle 串口句柄
 * @param src 数据源地址

@@ -66,6 +66,16 @@ typedef struct
 */
 int serial_read(serial_handle_t *handle,char *dst,int size);
 
+/*
+* @brief 串口输出缓存可用空间
+* @param handle 串口句柄
+* @param 
+* @param 
+* @return < 0 错误
+* @return >= 0 可写入的数量
+* @note 可重入
+*/
+int serial_writeable(serial_handle_t *handle);
 
 /*
 * @brief  从串口非阻塞的写入指定数量的数据

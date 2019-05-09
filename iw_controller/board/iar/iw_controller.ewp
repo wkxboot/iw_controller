@@ -359,6 +359,7 @@
                     <state>$PROJ_DIR$/../../board/user/tasks</state>
                     <state>$PROJ_DIR$/../../board/user/debug/cpu</state>
                     <state>$PROJ_DIR$/../../board/user/debug/log</state>
+                    <state>$PROJ_DIR$/../../board/user/debug/log/printf</state>
                     <state>$PROJ_DIR$/../../board/user/debug/log/SEGGER_RTT_V612j/RTT</state>
                     <state>$PROJ_DIR$/../../board/user/rtos</state>
                     <state>$PROJ_DIR$/../../board/user/circle_buffer</state>
@@ -2122,6 +2123,12 @@
                     </group>
                     <file>
                         <name>$PROJ_DIR$\..\user\debug\log\log.c</name>
+                    </file>
+                </group>
+                <group>
+                    <name>printf</name>
+                    <file>
+                        <name>$PROJ_DIR$\..\user\debug\log\printf\printf.c</name>
                     </file>
                 </group>
             </group>

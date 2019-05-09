@@ -41,7 +41,7 @@ static int port_ymodem_recv(serial_handle_t *handle,uint8_t *dst,uint32_t size,u
             return -1;
         }
 
-        rc = serial_read(handle,(char*)dst,read_left);
+        rc = serial_read(handle,(char*)dst + read_total,read_left);
         if (rc < 0) {
             log_error("ymodem read err.\r\n");
             return -1;

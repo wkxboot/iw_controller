@@ -41,7 +41,13 @@ int circle_buffer_flush(circle_buffer_t *cb);
 * @note
 */
 int circle_buffer_size(circle_buffer_t *cb);
-
+/*
+* @brief 循环缓存空闲容量
+* @param cb 循环缓存指针
+* @return 循环缓存空闲容量
+* @note
+*/
+int circle_buffer_free_size(circle_buffer_t *cb);
 /*
 * @brief 循环缓存已使用容量
 * @param cb 循环缓存指针
