@@ -48,7 +48,10 @@ typedef enum
 /*协议时间*/
 #define  ADU_WAIT_TIMEOUT              osWaitForever
 #define  ADU_FRAME_TIMEOUT             3
-#define  ADU_RSP_TIMEOUT               35
+#define  ADU_QUERY_WEIGHT_TIMEOUT      35
+#define  ADU_REMOVE_TARE_TIMEOUT       250
+#define  ADU_CALIBRATION_ZERO_TIMEOUT  250
+#define  ADU_CALIBRATION_FULL_TIMEOUT  250
 #define  ADU_SEND_TIMEOUT              5
 
 
@@ -370,19 +373,17 @@ static int parse_pdu(const uint8_t *pdu,int size,const uint8_t addr,const uint8_
 * @param value 操作值指针
 * @param size 操作值数量
 * @param rsp 回应缓存
+* @param timeout 回应超时
 * @return > 0 回应的数据量
 * @return -1 失败
 * @note
 */
-static int scale_task_poll(serial_handle_t *handle,uint8_t addr,uint8_t code,uint8_t *value,uint8_t size,uint8_t *rsp)
+static int scale_task_poll(serial_handle_t *handle,uint8_t addr,uint8_t code,uint8_t *value,uint8_t size,uint8_t *rsp,uint32_t timeout)
 {
     int rc ;
     uint8_t adu_send[ADU_SIZE_MAX];
     uint8_t adu_recv[ADU_SIZE_MAX];
 
-    utils_timer_t timer;
-
-    utils_timer_init(&timer,ADU_RSP_TIMEOUT,false);
     rc = build_adu(adu_send,addr,code,value,size);
     if (rc <= 0) {
         return -1;
@@ -393,7 +394,7 @@ static int scale_task_poll(serial_handle_t *handle,uint8_t addr,uint8_t code,uin
         return -1;
     }
 
-    rc = receive_adu(handle,adu_recv,ADU_RSP_TIMEOUT);
+    rc = receive_adu(handle,adu_recv,timeout);
     if (rc <= 0) {
         /*清空接收缓存*/
         serial_flush(handle);
@@ -433,7 +434,7 @@ void scale_task(void const *argument)
  
             /*获取净重值*/
             if (req_msg.request.type == SCALE_TASK_MSG_TYPE_NET_WEIGHT) { 
-                rc = scale_task_poll(&task_contex->handle,task_contex->phy_addr,PDU_CODE_NET_WEIGHT,req_value,0,rsp_value);
+                rc = scale_task_poll(&task_contex->handle,task_contex->phy_addr,PDU_CODE_NET_WEIGHT,req_value,0,rsp_value,ADU_QUERY_WEIGHT_TIMEOUT);
                 if (rc < 0) {
                     net_weight_msg.response.weight = SCALE_TASK_NET_WEIGHT_ERR_VALUE;
                     log_error("scale:%d poll net weight err.\r\n",task_contex->internal_addr);
@@ -456,7 +457,7 @@ void scale_task(void const *argument)
 
             /*去除皮重*/
             if (req_msg.request.type == SCALE_TASK_MSG_TYPE_REMOVE_TARE_WEIGHT) { 
-                rc = scale_task_poll(&task_contex->handle,task_contex->phy_addr,PDU_CODE_REMOVE_TARE_WEIGHT,req_value,0,rsp_value);
+                rc = scale_task_poll(&task_contex->handle,task_contex->phy_addr,PDU_CODE_REMOVE_TARE_WEIGHT,req_value,0,rsp_value,ADU_REMOVE_TARE_TIMEOUT);
                 if (rc < 0) {
                     remove_tare_msg.response.result = SCALE_TASK_FAIL;
                     log_error("scale:%d poll remove tare weight err.\r\n",task_contex->internal_addr);
@@ -477,7 +478,7 @@ void scale_task(void const *argument)
             if (req_msg.request.type == SCALE_TASK_MSG_TYPE_CALIBRATION_ZERO_WEIGHT) { 
                 req_value[0] = req_msg.request.weight & 0xFF;
                 req_value[1] = req_msg.request.weight >> 8;
-                rc = scale_task_poll(&task_contex->handle,task_contex->phy_addr,PDU_CODE_CALIBRATION_ZERO,req_value,2,rsp_value);
+                rc = scale_task_poll(&task_contex->handle,task_contex->phy_addr,PDU_CODE_CALIBRATION_ZERO,req_value,2,rsp_value,ADU_CALIBRATION_ZERO_TIMEOUT);
                 if (rc < 0) {
                     calibration_zero_msg.response.result = SCALE_TASK_FAIL;
                     log_error("scale:%d poll calibration zero weight err.\r\n",task_contex->internal_addr);
@@ -498,7 +499,7 @@ void scale_task(void const *argument)
             if (req_msg.request.type == SCALE_TASK_MSG_TYPE_CALIBRATION_FULL_WEIGHT) { 
                 req_value[0] = req_msg.request.weight & 0xFF;
                 req_value[1] = req_msg.request.weight >> 8;
-                rc = scale_task_poll(&task_contex->handle,task_contex->phy_addr,PDU_CODE_CALIBRATION_FULL,req_value,2,rsp_value);
+                rc = scale_task_poll(&task_contex->handle,task_contex->phy_addr,PDU_CODE_CALIBRATION_FULL,req_value,2,rsp_value,ADU_CALIBRATION_ZERO_TIMEOUT);
                 if (rc < 0) {
                     calibration_full_msg.response.result = SCALE_TASK_FAIL;
                     log_error("scale:%d poll calibration full weight err.\r\n",task_contex->internal_addr);

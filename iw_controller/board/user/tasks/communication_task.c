@@ -102,8 +102,16 @@ static communication_task_contex_t communication_task_contex;
 /*协议时间*/
 #define  ADU_WAIT_TIMEOUT                           osWaitForever
 #define  ADU_FRAME_TIMEOUT                          3
-#define  ADU_RSP_TIMEOUT                            40
+#define  ADU_QUERY_WEIGHT_TIMEOUT                   40
+#define  ADU_REMOVE_TARE_TIMEOUT                    260
+#define  ADU_CALIBRATION_ZERO_TIMEOUT               260
+#define  ADU_CALIBRATION_FULL_TIMEOUT               260
 #define  ADU_LOCK_RSP_TIMEOUT                       850
+#define  ADU_UNLOCK_RSP_TIMEOUT                     850
+#define  ADU_QUERY_DOOR_STATUS_TIMEOUT              40
+#define  ADU_QUERY_LOCK_STATUS_TIMEOUT              40
+#define  ADU_QUERY_TEMPERATURE_TIMEOUT              40
+#define  ADU_QUERY_SET_TEMPERATURE_TIMEOUT          260
 #define  ADU_SCALE_CNT_MAX                          20
 #define  ADU_SEND_TIMEOUT                           5
 
@@ -279,7 +287,7 @@ static int query_net_weight(const communication_task_contex_t *contex,const uint
     scale_task_message_t req_msg[SCALE_CNT_MAX],rsp_msg;
     utils_timer_t timer;
 
-    utils_timer_init(&timer,ADU_RSP_TIMEOUT,false);
+    utils_timer_init(&timer,ADU_QUERY_WEIGHT_TIMEOUT,false);
     /*全部电子秤任务*/
     if (addr == 0) {      
         /*发送消息*/
@@ -350,7 +358,7 @@ static int remove_tare_weight(const communication_task_contex_t *contex,const ui
     utils_timer_t timer;
     bool success = true;
 
-    utils_timer_init(&timer,ADU_RSP_TIMEOUT,false);
+    utils_timer_init(&timer,ADU_REMOVE_TARE_TIMEOUT,false);
     /*全部电子秤任务*/
     if (addr == 0) {      
         /*发送消息*/
@@ -424,7 +432,7 @@ static int calibration_zero(const communication_task_contex_t *contex,const uint
         log_error("calibration zero weight:%d != 0 err.\r\n",weight);
         return -1;
     }
-    utils_timer_init(&timer,ADU_RSP_TIMEOUT,false);
+    utils_timer_init(&timer,ADU_CALIBRATION_ZERO_TIMEOUT,false);
 
     /*全部电子秤任务*/
     if (addr == 0) {      
@@ -501,7 +509,7 @@ static int calibration_full(const communication_task_contex_t *contex,const uint
         log_error("calibration full weight:%d <= 0 err.\r\n",weight);
         return -1;
     }
-    utils_timer_init(&timer,ADU_RSP_TIMEOUT,false);
+    utils_timer_init(&timer,ADU_CALIBRATION_FULL_TIMEOUT,false);
 
     /*全部电子秤任务*/
     if (addr == 0) {      
@@ -574,7 +582,7 @@ static int query_door_status(communication_task_contex_t *contex,uint8_t *door_s
 
     req_msg.request.type = LOCK_TASK_MSG_TYPE_DOOR_STATUS;    
     req_msg.request.rsp_message_queue_id = contex->query_door_status_rsp_msg_q_id;
-    utils_timer_init(&timer,ADU_RSP_TIMEOUT,false);
+    utils_timer_init(&timer,ADU_QUERY_DOOR_STATUS_TIMEOUT,false);
     
     /*发送消息*/
     status = osMessagePut(lock_task_msg_q_id,(uint32_t)&req_msg,utils_timer_value(&timer));
@@ -616,7 +624,7 @@ static int query_lock_status(communication_task_contex_t *contex,uint8_t *lock_s
 
     req_msg.request.type = LOCK_TASK_MSG_TYPE_LOCK_STATUS;    
     req_msg.request.rsp_message_queue_id = contex->query_lock_status_rsp_msg_q_id;
-    utils_timer_init(&timer,ADU_RSP_TIMEOUT,false);
+    utils_timer_init(&timer,ADU_QUERY_LOCK_STATUS_TIMEOUT,false);
     
     /*发送消息*/
     status = osMessagePut(lock_task_msg_q_id,(uint32_t)&req_msg,utils_timer_value(&timer));
@@ -659,7 +667,7 @@ static int unlock_lock(communication_task_contex_t *contex)
 
     req_msg.request.type = LOCK_TASK_MSG_TYPE_UNLOCK_LOCK;    
     req_msg.request.rsp_message_queue_id = contex->unlock_lock_rsp_msg_q_id;
-    utils_timer_init(&timer,ADU_LOCK_RSP_TIMEOUT,false);
+    utils_timer_init(&timer,ADU_UNLOCK_RSP_TIMEOUT,false);
     
     /*发送消息*/
     status = osMessagePut(lock_task_msg_q_id,(uint32_t)&req_msg,utils_timer_value(&timer));
@@ -742,7 +750,7 @@ static int query_temperature(communication_task_contex_t *contex,int8_t *tempera
 
     req_msg.request.type = TEMPERATURE_TASK_MSG_TYPE_TEMPERATURE;    
     req_msg.request.rsp_message_queue_id = contex->query_temperature_rsp_msg_q_id;
-    utils_timer_init(&timer,ADU_RSP_TIMEOUT,false);
+    utils_timer_init(&timer,ADU_QUERY_TEMPERATURE_TIMEOUT,false);
     
     /*发送消息*/
 
@@ -791,7 +799,7 @@ static int set_temperature_level(communication_task_contex_t *contex,uint8_t tem
     req_msg.request.type = COMPRESSOR_TASK_MSG_TYPE_SET_TEMPERATURE_LEVEL;    
     req_msg.request.rsp_message_queue_id = contex->set_temperature_level_rsp_msg_q_id;
     req_msg.request.temperature_setting = temperature;
-    utils_timer_init(&timer,ADU_RSP_TIMEOUT,false);
+    utils_timer_init(&timer,ADU_QUERY_SET_TEMPERATURE_TIMEOUT,false);
     
     /*发送消息*/
     status = osMessagePut(compressor_task_msg_q_id,(uint32_t)&req_msg,utils_timer_value(&timer));
