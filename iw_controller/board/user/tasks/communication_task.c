@@ -111,7 +111,7 @@ static communication_task_contex_t communication_task_contex;
 #define  ADU_QUERY_DOOR_STATUS_TIMEOUT              40
 #define  ADU_QUERY_LOCK_STATUS_TIMEOUT              40
 #define  ADU_QUERY_TEMPERATURE_TIMEOUT              40
-#define  ADU_QUERY_SET_TEMPERATURE_TIMEOUT          260
+#define  ADU_QUERY_SET_TEMPERATURE_TIMEOUT          500
 #define  ADU_SCALE_CNT_MAX                          20
 #define  ADU_SEND_TIMEOUT                           5
 
