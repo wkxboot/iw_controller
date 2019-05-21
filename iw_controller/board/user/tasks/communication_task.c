@@ -8,7 +8,7 @@
 #include "temperature_task.h"
 #include "compressor_task.h"
 #include "communication_task.h"
-#include "ymodem.h"
+#include "fymodem.h"
 #include "device_env.h"
 #include "md5.h"
 #include "log.h"
@@ -862,17 +862,16 @@ static int query_software_version(communication_task_contex_t *contex,uint32_t *
 static int process_update(application_update_t *update,uint32_t timeout)
 {
 #define  SIZE_STR_BUFFER               7
-    COM_StatusTypeDef status;
 
-    char file_name[FILE_NAME_LENGTH + 1];
+    char file_name[FYMODEM_FILE_NAME_MAX_LENGTH + 1];
     char md5_value[16];
     char md5_str_buffer[33];
     char size_str_buffer[SIZE_STR_BUFFER];
 
-    uint32_t size = 0;
+    int size = 0;
     
-    status = Ymodem_Receive(&communication_serial_handle,APPLICATION_UPDATE_BASE_ADDR,APPLICATION_SIZE_LIMIT,file_name,&size,timeout);
-    if (status == COM_OK) {
+    size = fymodem_receive(&communication_serial_handle,APPLICATION_UPDATE_BASE_ADDR,APPLICATION_SIZE_LIMIT,file_name,timeout);
+    if (size > 0) {
         log_debug("update file_name:%s.\r\n",file_name);
         if (size != update->size) {
             log_error("file ymodem get size:%d != notify size:%d.\r\n",size,update->size);
@@ -913,7 +912,7 @@ static int process_update(application_update_t *update,uint32_t timeout)
         hal_delay();
         __NVIC_SystemReset();
     } else {
-        log_error("ymodem recv update file err status:%d.\r\n",status);
+        log_error("ymodem recv update file err:%d.\r\n",size);
         return -1;
     }
 

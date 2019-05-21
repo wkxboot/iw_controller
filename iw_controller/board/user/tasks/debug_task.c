@@ -4,6 +4,7 @@
 #include "debug_task.h"
 #include "lock_task.h"
 #include "tasks_init.h"
+#include "device_env.h"
 #include "log.h"
 
 osThreadId   debug_task_hdl;
@@ -54,7 +55,14 @@ void debug_task(void const * argument)
                 log_error("debug put lock msg err:%d.\r\n",status);
             }
         }
- 
+        /*flush eeprom*/
+        if (strncmp(cmd,"flush",strlen("flush")) == 0) {
+            if (device_env_flush() == 0) {
+                log_debug("flush env ok.\r\n");
+            } else {
+                log_error("flush env err.\r\n");
+            }
+        } 
  
     }
 }  

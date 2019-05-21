@@ -7,6 +7,10 @@ extern "C" {
 
 /********************    配置设备环境开始    **************************************/
 #define  DEVICE_ENV_USE_BACKUP                 1            /*是否使用环境变量备份*/
+#define  DEVICE_ENV_USE_EEPROM                 1            /*是否使用EEPROM保存环境变量 如果是否 则使用flash*/
+
+#define  DEVICE_MIN_ERASE_SIZE                 256          /*最小擦除单元大小 bytes*/
+#define  DEVICE_ADDR_MAP_LIMIT                 0x00080000   /*设备最大地址映射*/  
 
 #define  BOOTLOADER_BASE_ADDR                  0x00000000UL /*bootloader基地址*/
 #define  BOOTLOADER_SIZE_LIMIT                 0x8000       /*bootloader最大容量*/
@@ -19,7 +23,14 @@ extern "C" {
 
 #define  APPLICATION_UPDATE_BASE_ADDR          0x00038000UL /*application更新基地址*/
 
-#define  DEVICE_MIN_ERASE_SIZE                 256          /*最小擦除单元大小 bytes*/
+/*使用eeprom*/
+#if  DEVICE_ENV_USE_EEPROM  > 0
+#define  DEVICE_ENV_BASE_ADDR                  0x40108000   /*环境变量基地址*/   
+#define  DEVICE_ENV_BACKUP_BASE_ADDR           0x40108100   /*环境变量备份基地址*/      
+#define  DEVICE_ENV_SIZE_LIMIT                 0x100        /*环境变量大小*/ 
+/*使用flash*/
+#else
+
 #define  DEVICE_ADDR_MAP_LIMIT                 0x00080000   /*设备最大地址映射*/    
     
 #define  DEVICE_ENV_BASE_ADDR                  0x00050000   /*环境变量基地址*/   
@@ -27,6 +38,7 @@ extern "C" {
 #define  DEVICE_ENV_BACKUP_BASE_ADDR           0x00050200   /*环境变量备份基地址*/      
      
 #define  DEVICE_ENV_SIZE_LIMIT                 (DEVICE_MIN_ERASE_SIZE * 2)   /*环境变量大小*/ 
+#endif
 
 
 /********************    配置设备环境结束    **************************************/
@@ -48,6 +60,9 @@ extern "C" {
 #error "device env base addr too small."
 #endif
 
+
+#if  DEVICE_ENV_USE_EEPROM == 0 
+
 #if  DEVICE_ENV_USE_BACKUP > 0
 #if  (DEVICE_ENV_BASE_ADDR + DEVICE_ENV_SIZE_LIMIT) > DEVICE_ENV_BACKUP_BASE_ADDR
 #error "device env backup base addr too small."
@@ -57,12 +72,14 @@ extern "C" {
 #error "device env backup limit addr large than device addr map."
 #endif
 
-#else
+#else 
 #if  (DEVICE_ENV_BASE_ADDR + DEVICE_ENV_SIZE_LIMIT) > DEVICE_ADDR_MAP_LIMIT
 #error "device env base limit addr large than device addr map."."
 #endif
 
 #endif
+#endif
+
 
 #define  ENV_BOOTLOADER_FLAG_NAME                  "bootloader"
 #define  ENV_BOOTLOADER_UPDATE_SIZE_NAME           "update_size"
@@ -91,13 +108,20 @@ extern "C" {
 int device_env_init(void);
 
 /*
+* @brief 环境变量冲刷
+* @param 无
+* @return 0：成功 -1：失败
+* @note
+*/
+int device_env_flush(void);
+
+/*
 * @brief 获取对应名称的环境变量值
 * @param name 环境变量名
 * @return 环境变量值 or null
 * @note
 */
 char *device_env_get(char *name);
-
 
 /*
 * @brief 设置环境变量值

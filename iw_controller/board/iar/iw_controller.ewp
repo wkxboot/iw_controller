@@ -365,6 +365,7 @@
                     <state>$PROJ_DIR$/../../board/user/circle_buffer</state>
                     <state>$PROJ_DIR$/../../board/user/utils</state>
                     <state>$PROJ_DIR$/../../board/user/flash_if</state>
+                    <state>$PROJ_DIR$/../../board/user/eeprom_if</state>
                     <state>$PROJ_DIR$/../../board/user/device_env</state>
                     <state>$PROJ_DIR$/../../board/user/update</state>
                     <state>$PROJ_DIR$/../../board/user/lib</state>
@@ -2139,6 +2140,12 @@
                 </file>
             </group>
             <group>
+                <name>eeprom_if</name>
+                <file>
+                    <name>$PROJ_DIR$\..\user\eeprom_if\eeprom_if.c</name>
+                </file>
+            </group>
+            <group>
                 <name>flash_if</name>
                 <file>
                     <name>$PROJ_DIR$\..\user\flash_if\flash_if.c</name>
@@ -2150,13 +2157,13 @@
                     <name>$PROJ_DIR$\..\user\lib\crc16.c</name>
                 </file>
                 <file>
+                    <name>$PROJ_DIR$\..\user\lib\fymodem.c</name>
+                </file>
+                <file>
                     <name>$PROJ_DIR$\..\user\lib\md5.c</name>
                 </file>
                 <file>
                     <name>$PROJ_DIR$\..\user\lib\utils.c</name>
-                </file>
-                <file>
-                    <name>$PROJ_DIR$\..\user\lib\ymodem.c</name>
                 </file>
             </group>
             <group>
@@ -2211,12 +2218,6 @@
                 </file>
                 <file>
                     <name>$PROJ_DIR$\..\user\tasks\watch_dog_task.c</name>
-                </file>
-            </group>
-            <group>
-                <name>update</name>
-                <file>
-                    <name>$PROJ_DIR$\..\user\update\update.c</name>
                 </file>
             </group>
         </group>

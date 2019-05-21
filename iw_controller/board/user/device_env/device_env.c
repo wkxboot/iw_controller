@@ -1,5 +1,9 @@
 #include "device_env.h"
+#if  DEVICE_ENV_USE_EEPROM > 0
+#include "eeprom_if.h"
+#else
 #include "flash_if.h"
+#endif
 #include "crc16.h"
 #include "log.h"
 
@@ -112,27 +116,33 @@ static int device_env_crc_check()
 static int device_env_do_save(void) 
 {
     int rc;
+#if DEVICE_ENV_USE_EEPROM > 0
+    rc = eeprom_if_write(DEVICE_ENV_BASE_ADDR,(uint8_t*)&device_env,sizeof(device_env_t));
+#else
     rc = flash_if_erase(DEVICE_ENV_BASE_ADDR,sizeof(device_env_t));
     if (rc != 0) {
         log_error("do save err.\r\n");
         return -1;
     }
-
     rc = flash_if_write(DEVICE_ENV_BASE_ADDR,(uint8_t*)&device_env,sizeof(device_env_t));
+#endif
+
     if (rc != 0) {
         log_error("do save err.\r\n");
         return -1;
     }
 
-#if DEVICE_ENV_USE_BACKUP > 0 /*环境变量备份*/
-
+#if DEVICE_ENV_USE_BACKUP > 0  /*环境变量备份*/
+#if DEVICE_ENV_USE_EEPROM > 0
+    rc = eeprom_if_write(DEVICE_ENV_BACKUP_BASE_ADDR,(uint8_t*)&device_env,sizeof(device_env_t));
+#else
     rc = flash_if_erase(DEVICE_ENV_BACKUP_BASE_ADDR,sizeof(device_env_t));
     if (rc != 0) {
         log_error("do backup save err.\r\n");
         return -1;
     }
-
     rc = flash_if_write(DEVICE_ENV_BACKUP_BASE_ADDR,(uint8_t*)&device_env,sizeof(device_env_t));
+#endif
     if (rc != 0) {
         log_error("do backup save err.\r\n");
         return -1;
@@ -143,6 +153,7 @@ static int device_env_do_save(void)
     log_debug("do save ok.\r\n");
     return 0;
 }
+
 /*
 * @brief 环境变量初始化
 * @param 无
@@ -154,7 +165,16 @@ int device_env_init(void)
     int rc;
 
     /*读取设备环境变量*/
+#if DEVICE_ENV_USE_EEPROM > 0
+    rc = eeprom_if_init();
+    if (rc != 0) {
+        log_error("eeprom init err.\r\n");
+        return -1;
+    }
+    rc = eeprom_if_read(DEVICE_ENV_BASE_ADDR,(uint8_t*)&device_env,sizeof(device_env_t));
+#else
     rc = flash_if_read(DEVICE_ENV_BASE_ADDR,(uint8_t*)&device_env,sizeof(device_env_t));
+#endif
     if (rc != 0) {
         log_error("read env err.code:%d.\r\n",rc);
         return -1;
@@ -166,7 +186,11 @@ int device_env_init(void)
 
 #if DEVICE_ENV_USE_BACKUP > 0 
         log_debug("read backup env...\r\n");
+#if DEVICE_ENV_USE_EEPROM > 0
+        rc = eeprom_if_read(DEVICE_ENV_BACKUP_BASE_ADDR,(uint8_t*)&device_env,sizeof(device_env_t));
+#else
         rc = flash_if_read(DEVICE_ENV_BACKUP_BASE_ADDR,(uint8_t*)&device_env,sizeof(device_env_t));
+#endif
         if (rc != 0) {
             log_error("read backup env err.code:%d.\r\n",rc);
             return -1;
@@ -184,6 +208,57 @@ int device_env_init(void)
     } else {
         log_warning("env crc ok. ");
     }
+
+    return 0;
+}
+
+/*
+* @brief 环境变量冲刷
+* @param 无
+* @return 0：成功 -1：失败
+* @note
+*/
+int device_env_flush(void) 
+{
+    int rc;
+
+    memset(&device_env,0x00,sizeof(device_env_t));
+
+#if DEVICE_ENV_USE_EEPROM > 0
+    rc = eeprom_if_write(DEVICE_ENV_BASE_ADDR,(uint8_t*)&device_env,sizeof(device_env_t));
+#else
+    rc = flash_if_erase(DEVICE_ENV_BASE_ADDR,sizeof(device_env_t));
+    if (rc != 0) {
+        log_error("do flush err.\r\n");
+        return -1;
+    }
+    rc = flash_if_write(DEVICE_ENV_BASE_ADDR,(uint8_t*)&device_env,sizeof(device_env_t));
+#endif
+
+    if (rc != 0) {
+        log_error("do flush err.\r\n");
+        return -1;
+    }
+
+#if DEVICE_ENV_USE_BACKUP > 0  /*环境变量备份*/
+#if DEVICE_ENV_USE_EEPROM > 0
+    rc = eeprom_if_write(DEVICE_ENV_BACKUP_BASE_ADDR,(uint8_t*)&device_env,sizeof(device_env_t));
+#else
+    rc = flash_if_erase(DEVICE_ENV_BACKUP_BASE_ADDR,sizeof(device_env_t));
+    if (rc != 0) {
+        log_error("do backup flush err.\r\n");
+        return -1;
+    }
+    rc = flash_if_write(DEVICE_ENV_BACKUP_BASE_ADDR,(uint8_t*)&device_env,sizeof(device_env_t));
+#endif
+    if (rc != 0) {
+        log_error("do backup flush err.\r\n");
+        return -1;
+    }
+
+#endif
+
+    log_debug("do flush ok.\r\n");
 
     return 0;
 }

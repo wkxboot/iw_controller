@@ -18,7 +18,7 @@
 osThreadId   watch_dog_task_hdl;
 
 
-#define  WDT_ENABLE                  1
+#define  WDT_ENABLE                  0
 
 #if  WDT_ENABLE  > 0 
 
