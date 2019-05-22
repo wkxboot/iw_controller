@@ -173,7 +173,7 @@ void compressor_task(void const *argument)
     temperature_str = device_env_get(COMPRESSOR_TASK_TEMPERATURE_ENV_NAME);
 
     if (temperature_str == NULL) {
-        log_info("level not exsit in flash.default:%d.\r\n",compressor.setting);
+        log_info("setting not exsit in flash.default:%d.\r\n",compressor.setting);
     } else {
         setting = atoi(temperature_str);
         if ((setting - COMPRESSOR_TASK_TEMPERATURE_OFFSET) >= COMPRESSOR_TASK_TEMPERATURE_SETTING_MIN || (setting + COMPRESSOR_TASK_TEMPERATURE_OFFSET) <= COMPRESSOR_TASK_TEMPERATURE_SETTING_MAX) {
@@ -182,7 +182,7 @@ void compressor_task(void const *argument)
             compressor.temperature_work = setting + COMPRESSOR_TASK_TEMPERATURE_OFFSET;
             compressor.temperature_stop = setting - COMPRESSOR_TASK_TEMPERATURE_OFFSET;
         } else {
-            log_info("level not exsit in flash.default:%d.\r\n",compressor.setting);
+            log_info("setting exsit in flash invalid.default:%d.\r\n",compressor.setting);
         }
     }
 
@@ -332,7 +332,7 @@ void compressor_task(void const *argument)
                     rc = device_env_set(COMPRESSOR_TASK_TEMPERATURE_ENV_NAME,temperature_str_buffer);
                     if (rc != 0) {
                         rsp_setting_msg.response.result = COMPRESSOR_TASK_FAIL;
-                        log_error("save temperature fail.\r\n");
+                        log_error("save temperature setting fail.\r\n");
                     } else {                                
                         log_debug("温度设置值:%dC成功.区间%dC~%dC.\r\n",setting,compressor.temperature_stop,compressor.temperature_work);
                         /*发送消息更新压缩机工作状态*/
