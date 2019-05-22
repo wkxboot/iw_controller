@@ -28,7 +28,7 @@ void communication_task(void const * argument);
 #define  COMMUNICATION_TASK_SCALE_DEFAULT_ADDR          1
 
 /*等待接收升级文件超时时间*/
-#define  COMMUNICATION_TASK_UPDATE_TIMEOUT              (20 * 1000)
+#define  COMMUNICATION_TASK_UPDATE_TIMEOUT              (10 * 1000)
 
 /*是否升级标志*/
 #define  COMMUNICATION_TASK_APPLICATION_UPDATE          0x11223344
