@@ -33,7 +33,7 @@ void compressor_task(void const *argument);
 
 #define  COMPRESSOR_TASK_TEMPERATURE_OFFSET            2
 #define  COMPRESSOR_TASK_TEMPERATURE_SETTING_MIN       0
-#define  COMPRESSOR_TASK_TEMPERATURE_SETTING_MAX       24
+#define  COMPRESSOR_TASK_TEMPERATURE_SETTING_MAX       30
 #define  COMPRESSOR_TASK_TEMPERATURE_SETTING_DEFAULT   6
 
 #define  COMPRESSOR_TASK_TEMPERATURE_ENV_NAME          "temperature"
@@ -47,8 +47,10 @@ enum
   COMPRESSOR_TASK_MSG_TYPE_WAIT_TIMEOUT,
   COMPRESSOR_TASK_MSG_TYPE_REST_TIMEOUT,
   COMPRESSOR_TASK_MSG_TYPE_TIMER_TIMEOUT,
-  COMPRESSOR_TASK_MSG_TYPE_SET_TEMPERATURE_LEVEL,
-  COMPRESSOR_TASK_MSG_TYPE_RSP_SET_TEMPERATURE_LEVEL
+  COMPRESSOR_TASK_MSG_TYPE_TEMPERATURE_SETTING,
+  COMPRESSOR_TASK_MSG_TYPE_RSP_TEMPERATURE_SETTING,
+  COMPRESSOR_TASK_MSG_TYPE_QUERY_TEMPERATURE_SETTING,
+  COMPRESSOR_TASK_MSG_TYPE_RSP_QUERY_TEMPERATURE_SETTING,
 };
 
 typedef struct
@@ -58,7 +60,7 @@ typedef struct
     struct 
     {  
         uint8_t type;/*请求消息类型*/
-        int16_t temperature_setting;/*设置的温度值*/
+        int8_t temperature_setting;/*设置的温度值*/
         int16_t temperature_int;/*整数温度值*/
         float temperature_float;/*浮点温度*/
         osMessageQId rsp_message_queue_id;/*回应的消息队列id*/
@@ -67,6 +69,7 @@ typedef struct
     {
         uint8_t type;/*回应的消息类型*/
         uint8_t result;/*回应的结果*/
+        int8_t temperature_setting;/*回应设置的温度值*/
     }response;
     };
 }compressor_task_message_t;/*压缩机任务消息体*/

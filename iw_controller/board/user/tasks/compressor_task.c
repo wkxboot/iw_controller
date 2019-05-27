@@ -40,7 +40,7 @@ typedef struct
     int8_t temperature_int;
     float temperature_float;
 
-    int16_t setting;
+    int8_t setting;
     float temperature_stop;
     float temperature_work;
 
@@ -156,11 +156,11 @@ void compressor_task(void const *argument)
     int rc;
     osEvent  os_event;
     osStatus status;
-    int16_t setting;
+    int8_t setting;
     char *temperature_str;
     char temperature_str_buffer[7];
 
-    compressor_task_message_t req_msg,req_update_msg,rsp_setting_msg;
+    compressor_task_message_t req_msg,req_update_msg,rsp_setting_msg,rsp_query_setting_msg;
     
     /*上电先关闭压缩机*/
     compressor_pwr_turn_off();
@@ -310,15 +310,26 @@ void compressor_task(void const *argument)
                 log_info("压缩机正在上电等待或者温度错误.跳过.\r\n");
             }
         }
+        /*查询压缩机工作温度配置消息*/
+        if (req_msg.request.type == COMPRESSOR_TASK_MSG_TYPE_QUERY_TEMPERATURE_SETTING){ 
+            /*发送消息给通信任务*/
+            rsp_query_setting_msg.response.type = COMPRESSOR_TASK_MSG_TYPE_RSP_QUERY_TEMPERATURE_SETTING;   
+            rsp_query_setting_msg.response.temperature_setting = compressor.setting ;  
+            status = osMessagePut(req_msg.request.rsp_message_queue_id,(uint32_t)&rsp_query_setting_msg,COMPRESSOR_TASK_PUT_MSG_TIMEOUT);
+            if (status != osOK) {
+                log_error("compressor put rsp query setting msg timeout error:%d\r\n",status);
+            } 
+        }
 
         /*配置压缩机工作温度区间消息*/
-        if (req_msg.request.type == COMPRESSOR_TASK_MSG_TYPE_SET_TEMPERATURE_LEVEL){ 
+        if (req_msg.request.type == COMPRESSOR_TASK_MSG_TYPE_TEMPERATURE_SETTING){ 
             setting = req_msg.request.temperature_setting;
             if (setting - COMPRESSOR_TASK_TEMPERATURE_OFFSET < COMPRESSOR_TASK_TEMPERATURE_SETTING_MIN ||\
                 setting + COMPRESSOR_TASK_TEMPERATURE_OFFSET > COMPRESSOR_TASK_TEMPERATURE_SETTING_MAX) {
                 rsp_setting_msg.response.result = COMPRESSOR_TASK_FAIL;
-                log_error("温度设置值:%d C无效.min:%d C max:%d C.\r\n.",
+                log_error("温度设置值:%d ± %d C无效.min:%d C max:%d C.\r\n.",
                             setting,
+                            COMPRESSOR_TASK_TEMPERATURE_OFFSET,
                             COMPRESSOR_TASK_TEMPERATURE_SETTING_MIN,
                             COMPRESSOR_TASK_TEMPERATURE_SETTING_MAX);
              } else {              
@@ -347,7 +358,7 @@ void compressor_task(void const *argument)
                 }
             }
             /*发送消息给通信任务*/
-            rsp_setting_msg.response.type = COMPRESSOR_TASK_MSG_TYPE_RSP_SET_TEMPERATURE_LEVEL;     
+            rsp_setting_msg.response.type = COMPRESSOR_TASK_MSG_TYPE_RSP_TEMPERATURE_SETTING;     
             status = osMessagePut(req_msg.request.rsp_message_queue_id,(uint32_t)&rsp_setting_msg,COMPRESSOR_TASK_PUT_MSG_TIMEOUT);
             if (status != osOK) {
                 log_error("compressor put rsp_setting msg timeout error:%d\r\n",status);

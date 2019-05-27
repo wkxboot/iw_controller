@@ -84,7 +84,8 @@ typedef struct
     osMessageQId lock_lock_rsp_msg_q_id;
     osMessageQId unlock_lock_rsp_msg_q_id;
     osMessageQId query_temperature_rsp_msg_q_id;
-    osMessageQId set_temperature_level_rsp_msg_q_id;
+    osMessageQId query_temperature_setting_rsp_msg_q_id;
+    osMessageQId temperature_setting_rsp_msg_q_id;
 }communication_task_contex_t;
     
 

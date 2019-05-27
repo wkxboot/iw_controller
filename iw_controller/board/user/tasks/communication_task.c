@@ -110,7 +110,8 @@ static communication_task_contex_t communication_task_contex;
 #define  ADU_UNLOCK_RSP_TIMEOUT                     850
 #define  ADU_QUERY_DOOR_STATUS_TIMEOUT              40
 #define  ADU_QUERY_LOCK_STATUS_TIMEOUT              40
-#define  ADU_QUERY_TEMPERATURE_TIMEOUT              40
+#define  ADU_QUERY_TEMPERATURE_TIMEOUT              20
+#define  ADU_QUERY_TEMPERATURE_SETTING_TIMEOUT      20
 #define  ADU_QUERY_SET_TEMPERATURE_TIMEOUT          500
 #define  ADU_SCALE_CNT_MAX                          20
 #define  ADU_SEND_TIMEOUT                           5
@@ -323,7 +324,7 @@ static int query_net_weight(const communication_task_contex_t *contex,const uint
             rsp_msg = *(scale_task_message_t *)os_event.value.v;
             if (rsp_msg.response.type != SCALE_TASK_MSG_TYPE_RSP_NET_WEIGHT) {     
                 log_error("comm net weight rsp type:%d err.\r\n",rsp_msg.response.type);
-                return -1;
+                continue;
             }
             value[rsp_msg.response.index] = rsp_msg.response.weight;
             flags ^= rsp_msg.response.flag;
@@ -331,7 +332,7 @@ static int query_net_weight(const communication_task_contex_t *contex,const uint
     }
         
     if (flags != 0) {
-        log_error("net weight query err.fags:%d.\r\n",flags);
+        log_error("net weight query timeout err.flags:%d.\r\n",flags);
         return -1;
     }
 
@@ -392,6 +393,7 @@ static int remove_tare_weight(const communication_task_contex_t *contex,const ui
             rsp_msg = *(scale_task_message_t *)os_event.value.v;
             if (rsp_msg.response.type != SCALE_TASK_MSG_TYPE_RSP_REMOVE_TARE_WEIGHT) {     
                 log_error("comm remove tare weight rsp type:%d err.\r\n",rsp_msg.response.type);
+                continue;
             }
             if (rsp_msg.response.result == SCALE_TASK_FAIL) {
                 success = false;
@@ -401,7 +403,7 @@ static int remove_tare_weight(const communication_task_contex_t *contex,const ui
     }
         
     if (flags != 0) {
-        log_error("comm remove tare weight err.fags:%d.\r\n",flags);
+        log_error("comm remove tare weight timeout err.flags:%d.\r\n",flags);
         return -1;
     }
 
@@ -469,6 +471,7 @@ static int calibration_zero(const communication_task_contex_t *contex,const uint
             rsp_msg = *(scale_task_message_t *)os_event.value.v;
             if (rsp_msg.response.type != SCALE_TASK_MSG_TYPE_RSP_CALIBRATION_ZERO_WEIGHT) {     
                 log_error("comm calibration zero weight rsp type:%d err.\r\n",rsp_msg.response.type);
+                continue;
             }
             if (rsp_msg.response.result == SCALE_TASK_FAIL) {
                 success = false;
@@ -478,7 +481,7 @@ static int calibration_zero(const communication_task_contex_t *contex,const uint
     }
         
     if (flags != 0) {
-        log_error("comm calibration zero internal timeout err.fags:%d.\r\n",flags);
+        log_error("comm calibration zero timeout err.flags:%d.\r\n",flags);
         return -1;
     }
 
@@ -546,7 +549,7 @@ static int calibration_full(const communication_task_contex_t *contex,const uint
             rsp_msg = *(scale_task_message_t *)os_event.value.v;
             if (rsp_msg.response.type != SCALE_TASK_MSG_TYPE_RSP_CALIBRATION_FULL_WEIGHT) {     
                 log_error("comm calibration full weight rsp type:%d err.\r\n",rsp_msg.response.type);
-                return -1;
+                continue;
             }
             if (rsp_msg.response.result == SCALE_TASK_FAIL) {
                 success = false;
@@ -556,7 +559,7 @@ static int calibration_full(const communication_task_contex_t *contex,const uint
     }
         
     if (flags != 0) {
-        log_error("comm calibration full internal timeout err.fags:%d.\r\n",flags);
+        log_error("comm calibration full timeout err.flags:%d.\r\n",flags);
         return -1;
     }
 
@@ -595,8 +598,9 @@ static int query_door_status(communication_task_contex_t *contex,uint8_t *door_s
             rsp_msg = *(lock_task_message_t *)os_event.value.v;
             if (rsp_msg.response.type != LOCK_TASK_MSG_TYPE_RSP_DOOR_STATUS) {     
                 log_error("comm query door status rsp type:%d err.\r\n",rsp_msg.response.type);
-                return -1;
+                continue;
             }
+
             *door_status = rsp_msg.response.status;
             return 0;
         }
@@ -637,8 +641,9 @@ static int query_lock_status(communication_task_contex_t *contex,uint8_t *lock_s
             rsp_msg = *(lock_task_message_t *)os_event.value.v;
             if (rsp_msg.response.type != LOCK_TASK_MSG_TYPE_RSP_LOCK_STATUS) {     
                 log_error("comm query lock status rsp type:%d err.\r\n",rsp_msg.response.type);
-                return -1;
+                continue;
             }
+
             *lock_status = rsp_msg.response.status;
             return 0;
         }
@@ -680,10 +685,10 @@ static int unlock_lock(communication_task_contex_t *contex)
             rsp_msg = *(lock_task_message_t *)os_event.value.v;
             if (rsp_msg.response.type != LOCK_TASK_MSG_TYPE_RSP_UNLOCK_LOCK_RESULT) {     
                 log_error("comm unlock lock rsp type:%d err.\r\n",rsp_msg.response.type);
-                return -1;
+                continue;
             }
-            return rsp_msg.response.result == LOCK_TASK_SUCCESS ? 0 : -1;
-            
+
+            return rsp_msg.response.result == LOCK_TASK_SUCCESS ? 0 : -1;          
         }
     }
         
@@ -711,7 +716,6 @@ static int lock_lock(communication_task_contex_t *contex)
     utils_timer_init(&timer,ADU_LOCK_RSP_TIMEOUT,false);
     
     /*发送消息*/
-
     status = osMessagePut(lock_task_msg_q_id,(uint32_t)&req_msg,utils_timer_value(&timer));
     log_assert(status == osOK);
 
@@ -722,8 +726,9 @@ static int lock_lock(communication_task_contex_t *contex)
             rsp_msg = *(lock_task_message_t *)os_event.value.v;
             if (rsp_msg.response.type != LOCK_TASK_MSG_TYPE_RSP_LOCK_LOCK_RESULT) {     
                 log_error("comm lock lock rsp type:%d err.\r\n",rsp_msg.response.type);
-                return -1;
+                continue;
             }
+
             return rsp_msg.response.result == LOCK_TASK_SUCCESS ? 0 : -1;
         }
     }
@@ -753,7 +758,6 @@ static int query_temperature(communication_task_contex_t *contex,int8_t *tempera
     utils_timer_init(&timer,ADU_QUERY_TEMPERATURE_TIMEOUT,false);
     
     /*发送消息*/
-
     status = osMessagePut(temperature_task_msg_q_id,(uint32_t)&req_msg,utils_timer_value(&timer));
     log_assert(status == osOK);
 
@@ -764,7 +768,7 @@ static int query_temperature(communication_task_contex_t *contex,int8_t *tempera
             rsp_msg = *(temperature_task_message_t *)os_event.value.v;
             if (rsp_msg.response.type != TEMPERATURE_TASK_MSG_TYPE_RSP_TEMPERATURE) {     
                 log_error("comm query temperature rsp type:%d err.\r\n",rsp_msg.response.type);
-                return -1;
+                continue;
             }
             if (rsp_msg.response.err == false) {
                 *temperature = rsp_msg.response.temperature_int;
@@ -779,16 +783,15 @@ static int query_temperature(communication_task_contex_t *contex,int8_t *tempera
     return -1;
 }
 
-
 /*
-* @brief 设置压缩机温度控制区间
+* @brief 查询温度设置值
 * @param contex 通信任务上下文
-* @param temperature 温度
+* @param setting 温度设置指针
 * @return -1 失败
 * @return  0 成功
 * @note
 */
-static int set_temperature_level(communication_task_contex_t *contex,uint8_t temperature)
+static int query_temperature_setting(communication_task_contex_t *contex,int8_t *setting)
 {
     osStatus status;
     osEvent os_event;
@@ -796,10 +799,9 @@ static int set_temperature_level(communication_task_contex_t *contex,uint8_t tem
     compressor_task_message_t req_msg,rsp_msg;
     utils_timer_t timer;
 
-    req_msg.request.type = COMPRESSOR_TASK_MSG_TYPE_SET_TEMPERATURE_LEVEL;    
-    req_msg.request.rsp_message_queue_id = contex->set_temperature_level_rsp_msg_q_id;
-    req_msg.request.temperature_setting = temperature;
-    utils_timer_init(&timer,ADU_QUERY_SET_TEMPERATURE_TIMEOUT,false);
+    req_msg.request.type = COMPRESSOR_TASK_MSG_TYPE_QUERY_TEMPERATURE_SETTING;    
+    req_msg.request.rsp_message_queue_id = contex->query_temperature_setting_rsp_msg_q_id;
+    utils_timer_init(&timer,ADU_QUERY_TEMPERATURE_SETTING_TIMEOUT,false);
     
     /*发送消息*/
     status = osMessagePut(compressor_task_msg_q_id,(uint32_t)&req_msg,utils_timer_value(&timer));
@@ -807,13 +809,58 @@ static int set_temperature_level(communication_task_contex_t *contex,uint8_t tem
 
     /*等待消息*/
     while (utils_timer_value(&timer) > 0) {
-        os_event = osMessageGet(contex->set_temperature_level_rsp_msg_q_id,utils_timer_value(&timer));
+        os_event = osMessageGet(contex->query_temperature_setting_rsp_msg_q_id,utils_timer_value(&timer));
         if (os_event.status == osEventMessage ){
             rsp_msg = *(compressor_task_message_t *)os_event.value.v;
-            if (rsp_msg.response.type != COMPRESSOR_TASK_MSG_TYPE_RSP_SET_TEMPERATURE_LEVEL) {     
-                log_error("comm set temperature level rsp type:%d err.\r\n",rsp_msg.response.type);
-                return -1;
+            if (rsp_msg.response.type != COMPRESSOR_TASK_MSG_TYPE_RSP_QUERY_TEMPERATURE_SETTING) {     
+                log_error("comm query temperature setting rsp type:%d err.\r\n",rsp_msg.response.type);
+                continue;
             }
+
+            *setting = rsp_msg.response.temperature_setting;
+            return 0;
+        }
+    }
+        
+    log_error("comm query temperature setting timeout err.\r\n");
+    return -1;
+}
+
+/*
+* @brief 设置压缩机温度控制区间
+* @param contex 通信任务上下文
+* @param setting 温度设置值
+* @return -1 失败
+* @return  0 成功
+* @note
+*/
+static int temperature_setting(communication_task_contex_t *contex,int8_t setting)
+{
+    osStatus status;
+    osEvent os_event;
+
+    compressor_task_message_t req_msg,rsp_msg;
+    utils_timer_t timer;
+
+    req_msg.request.type = COMPRESSOR_TASK_MSG_TYPE_TEMPERATURE_SETTING;    
+    req_msg.request.rsp_message_queue_id = contex->temperature_setting_rsp_msg_q_id;
+    req_msg.request.temperature_setting = setting;
+    utils_timer_init(&timer,ADU_QUERY_TEMPERATURE_SETTING_TIMEOUT,false);
+    
+    /*发送消息*/
+    status = osMessagePut(compressor_task_msg_q_id,(uint32_t)&req_msg,utils_timer_value(&timer));
+    log_assert(status == osOK);
+
+    /*等待消息*/
+    while (utils_timer_value(&timer) > 0) {
+        os_event = osMessageGet(contex->temperature_setting_rsp_msg_q_id,utils_timer_value(&timer));
+        if (os_event.status == osEventMessage ){
+            rsp_msg = *(compressor_task_message_t *)os_event.value.v;
+            if (rsp_msg.response.type != COMPRESSOR_TASK_MSG_TYPE_RSP_TEMPERATURE_SETTING) {     
+                log_error("comm temperature setting rsp type:%d err.\r\n",rsp_msg.response.type);
+                continue;
+            }
+
             return rsp_msg.response.result == COMPRESSOR_TASK_SUCCESS ? 0 : -1;
         }
     }
@@ -912,7 +959,7 @@ static int process_update(application_update_t *update,uint32_t timeout)
         hal_delay();
         __NVIC_SystemReset();
     } else {
-        log_error("ymodem recv update file err:%d.\r\n",size);
+        log_error("ymodem recv update file err.size:%d.\r\n",size);
         return -1;
     }
 
@@ -988,7 +1035,7 @@ static int parse_adu(uint8_t *adu,uint8_t size,uint8_t *rsp,application_update_t
     uint8_t communication_addr;
     uint8_t code;
     uint8_t scale_addr;
-    uint8_t temperature_setting;
+    int8_t setting;
     uint16_t manufacturer_id;
     uint32_t software_verion;
     uint16_t calibration_weight;
@@ -1166,15 +1213,22 @@ static int parse_adu(uint8_t *adu,uint8_t size,uint8_t *rsp,application_update_t
                 rsp[rsp_offset ++] = DATA_STATUS_LOCK_UNLOCKED; 
             }
             break;
-        case CODE_QUERY_TEMPERATURE:/*查询温度*/
+        case CODE_QUERY_TEMPERATURE:/*查询温度设置和温度值*/
             if (size != ADU_DATA_REGION_QUERY_TEMPERATURE_SIZE) {
                 log_error("query temperature data size:%d != %d err.\r\n",size,ADU_DATA_REGION_QUERY_TEMPERATURE_SIZE);
                 return -1;
             }
             log_debug("query temperature...\r\n");
+            rc = query_temperature_setting(&communication_task_contex,&setting);
+            if (rc != 0) {
+                log_error("query temperature setting internal err.\r\n");
+                return -1;
+            }
+            rsp[rsp_offset ++] = setting;
+
             rc = query_temperature(&communication_task_contex,&temperature);
             if (rc != 0) {
-                log_error("query door status internal err.\r\n");
+                log_error("query temperature internal err.\r\n");
                 return -1;
             }
             rsp[rsp_offset ++] = temperature;
@@ -1184,9 +1238,9 @@ static int parse_adu(uint8_t *adu,uint8_t size,uint8_t *rsp,application_update_t
                 log_error("set temperature data size:%d != %d err.\r\n",size,ADU_DATA_REGION_SET_TEMPERATURE_SIZE);
                 return -1;
             }
-            temperature_setting = adu[ADU_DATA_REGION_OFFSET + DATA_REGION_TEMPERATURE_OFFSET];
-            log_debug("set temperature :%d...\r\n",temperature_setting);
-            rc = set_temperature_level(&communication_task_contex,temperature_setting);
+            setting = adu[ADU_DATA_REGION_OFFSET + DATA_REGION_TEMPERATURE_OFFSET];
+            log_debug("set temperature :%d...\r\n",setting);
+            rc = temperature_setting(&communication_task_contex,setting);
             if (rc == 0) {
                 rsp[rsp_offset ++] = DATA_RESULT_SET_TEMPERATURE_SUCCESS;     
             } else {
@@ -1516,10 +1570,14 @@ static void communication_task_contex_init(communication_task_contex_t *contex)
     osMessageQDef(query_temperature_rsp_msg_q,1,uint32_t);
     contex->query_temperature_rsp_msg_q_id = osMessageCreate(osMessageQ(query_temperature_rsp_msg_q),0);
     log_assert(contex->query_temperature_rsp_msg_q_id);
+    /*查询温度设置消息队列*/
+    osMessageQDef(query_temperature_setting_rsp_msg_q,1,uint32_t);
+    contex->query_temperature_setting_rsp_msg_q_id = osMessageCreate(osMessageQ(query_temperature_setting_rsp_msg_q),0);
+    log_assert(contex->query_temperature_setting_rsp_msg_q_id);
     /*设置温度等级消息队列*/
-    osMessageQDef(set_temperature_level_rsp_msg_q,1,uint32_t);
-    contex->set_temperature_level_rsp_msg_q_id = osMessageCreate(osMessageQ(set_temperature_level_rsp_msg_q),0);
-    log_assert(contex->set_temperature_level_rsp_msg_q_id);
+    osMessageQDef(temperature_setting_rsp_msg_q,1,uint32_t);
+    contex->temperature_setting_rsp_msg_q_id = osMessageCreate(osMessageQ(temperature_setting_rsp_msg_q),0);
+    log_assert(contex->temperature_setting_rsp_msg_q_id);
 
     /*净重回应消息队列*/
     osMessageQDef(net_weight_rsp_msg_q,SCALE_CNT_MAX,uint32_t);
