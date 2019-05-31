@@ -38,6 +38,11 @@ typedef struct
 /*内部静态环境变量*/
 static device_env_t device_env;
 
+#if DEVICE_ENV_USE_EEPROM > 0
+/*内部静态备份环境变量*/
+static device_env_t device_env_backup;
+#endif
+
 /*
 * @brief 
 * @param
@@ -90,7 +95,7 @@ static int device_env_match(char *name,int index2)
 * @return 
 * @note
 */
-static void device_env_crc_update() 
+static void device_env_crc_update(void)
 {
     device_env.crc = calculate_crc16(device_env.data_region,DEVICE_ENV_DATA_SIZE_LIMIT);
 }
@@ -102,55 +107,92 @@ static void device_env_crc_update()
 * @return 
 * @note
 */
-static int device_env_crc_check() 
+static int device_env_crc_check(device_env_t *env) 
 {
-    return device_env.crc == calculate_crc16(device_env.data_region,DEVICE_ENV_DATA_SIZE_LIMIT) ? 1 : 0;
+    log_assert(env);
+    
+    return env->crc == calculate_crc16(env->data_region,DEVICE_ENV_DATA_SIZE_LIMIT) ? 0 : -1;
 }
 
 /*
-* @brief 环境变量值保存到非易存储体
-* @param name 无
+* @brief 写入非易存储体
+* @param addr 读取地址
+* @param dst 保存地址
+* @param size 数据量
+* @return 0：成功 -1：失败
+* @note
+*/
+static int device_env_read(uint32_t addr,uint8_t *dst,uint32_t size) 
+{
+    int rc;
+    
+#if DEVICE_ENV_USE_EEPROM > 0
+    rc = eeprom_if_read(addr,dst,size);
+#else
+    rc = flash_if_read(addr,dst,size);
+#endif
+    if (rc != 0) {
+        log_error("env read err.code:%d.\r\n",rc);
+        return -1;
+    }
+    
+    return 0;
+}
+
+/*
+* @brief 写入非易存储体
+* @param addr 写入地址
+* @param src 数据地址
+* @param size 数据量
+* @return 0：成功 -1：失败
+* @note
+*/
+static int device_env_write(uint32_t addr,uint8_t *src,uint32_t size) 
+{
+    int rc;
+#if DEVICE_ENV_USE_EEPROM > 0
+    rc = eeprom_if_write(addr,src,size);
+#else
+    rc = flash_if_erase(addr,size);
+    if (rc != 0) {
+        return -1;
+    }
+    rc = flash_if_write(addr,src,size);
+#endif
+
+    if (rc != 0) {
+        log_error("env write err.code:%d.\r\n",rc);
+        return -1;
+    }  
+  
+    return 0;
+}
+
+/*
+* @brief 环境变量值和备份环境变量保存到非易存储体
+* @param 无
 * @return 0：成功 -1：失败
 * @note
 */
 static int device_env_do_save(void) 
 {
     int rc;
-#if DEVICE_ENV_USE_EEPROM > 0
-    rc = eeprom_if_write(DEVICE_ENV_BASE_ADDR,(uint8_t*)&device_env,sizeof(device_env_t));
-#else
-    rc = flash_if_erase(DEVICE_ENV_BASE_ADDR,sizeof(device_env_t));
+    /*保存环境变量*/
+    rc = device_env_write(DEVICE_ENV_BASE_ADDR,(uint8_t*)&device_env,sizeof(device_env_t));
     if (rc != 0) {
         log_error("do save err.\r\n");
-        return -1;
+        return -1;     
     }
-    rc = flash_if_write(DEVICE_ENV_BASE_ADDR,(uint8_t*)&device_env,sizeof(device_env_t));
-#endif
-
-    if (rc != 0) {
-        log_error("do save err.\r\n");
-        return -1;
-    }
-
-#if DEVICE_ENV_USE_BACKUP > 0  /*环境变量备份*/
-#if DEVICE_ENV_USE_EEPROM > 0
-    rc = eeprom_if_write(DEVICE_ENV_BACKUP_BASE_ADDR,(uint8_t*)&device_env,sizeof(device_env_t));
-#else
-    rc = flash_if_erase(DEVICE_ENV_BACKUP_BASE_ADDR,sizeof(device_env_t));
+#if DEVICE_ENV_USE_BACKUP > 0 
+    /*保存环境变量备份*/
+    rc = device_env_write(DEVICE_ENV_BACKUP_BASE_ADDR,(uint8_t*)&device_env,sizeof(device_env_t));
     if (rc != 0) {
         log_error("do backup save err.\r\n");
-        return -1;
-    }
-    rc = flash_if_write(DEVICE_ENV_BACKUP_BASE_ADDR,(uint8_t*)&device_env,sizeof(device_env_t));
-#endif
-    if (rc != 0) {
-        log_error("do backup save err.\r\n");
-        return -1;
-    }
-
+        return -1;     
+    }    
 #endif
 
-    log_debug("do save ok.\r\n");
+    log_warning("do save ok.\r\n");
     return 0;
 }
 
@@ -163,51 +205,90 @@ static int device_env_do_save(void)
 int device_env_init(void) 
 {
     int rc;
-
-    /*读取设备环境变量*/
+#if DEVICE_ENV_USE_BACKUP > 0 
+    int rc_backup;
+#endif
+    
+    /*初始化接口*/
 #if DEVICE_ENV_USE_EEPROM > 0
     rc = eeprom_if_init();
+#else 
+    rc = flash_if_init();
+#endif
+    
     if (rc != 0) {
-        log_error("eeprom init err.\r\n");
+        log_error("env if init err.\r\n");
         return -1;
     }
-    rc = eeprom_if_read(DEVICE_ENV_BASE_ADDR,(uint8_t*)&device_env,sizeof(device_env_t));
-#else
-    rc = flash_if_read(DEVICE_ENV_BASE_ADDR,(uint8_t*)&device_env,sizeof(device_env_t));
-#endif
+    log_warning("read env...\r\n");    
+    /*读取环境变量*/
+    rc = device_env_read(DEVICE_ENV_BASE_ADDR,(uint8_t*)&device_env,sizeof(device_env_t));
     if (rc != 0) {
-        log_error("read env err.code:%d.\r\n",rc);
+        log_error("read env err.\r\n");
         return -1;
     }
     /*对比校验值*/
-    rc = device_env_crc_check();
-    if (!rc) {
-        log_warning("env crc bad. ");
+    rc = device_env_crc_check(&device_env);
 
 #if DEVICE_ENV_USE_BACKUP > 0 
-        log_debug("read backup env...\r\n");
-#if DEVICE_ENV_USE_EEPROM > 0
-        rc = eeprom_if_read(DEVICE_ENV_BACKUP_BASE_ADDR,(uint8_t*)&device_env,sizeof(device_env_t));
-#else
-        rc = flash_if_read(DEVICE_ENV_BACKUP_BASE_ADDR,(uint8_t*)&device_env,sizeof(device_env_t));
-#endif
-        if (rc != 0) {
-            log_error("read backup env err.code:%d.\r\n",rc);
-            return -1;
+    /*读取备份环境变量*/
+    log_warning("read backup env...\r\n");
+    rc_backup = device_env_read(DEVICE_ENV_BACKUP_BASE_ADDR,(uint8_t*)&device_env_backup,sizeof(device_env_t));
+    if (rc_backup != 0) {
+        log_error("read backup env err.\r\n");
+        return -1;
+    }   
+    /*对比校验值*/
+    rc_backup = device_env_crc_check(&device_env_backup);
+    
+    /*如果两者都是有效的*/
+    if (rc == 0 && rc_backup == 0) {
+        log_warning("all env ok.");
+        /*检查两者是否一致 如果不一致 那么环境变量应该是最新的*/
+        if (device_env.crc != device_env_backup.crc) {
+            device_env_backup = device_env;
+            /*同步备份环境变量*/
+            rc_backup = device_env_write(DEVICE_ENV_BACKUP_BASE_ADDR,(uint8_t*)&device_env_backup,sizeof(device_env_t));
+            if (rc_backup != 0) {
+               log_error("sync backup env err.\r\n");
+               return -1;
+            }
+            log_warning("sync backup env ok.\r\n");
         }
-        /*如果备份环境变量是有效的，就使用备份*/
-        rc = device_env_crc_check();
-        if (rc) {
-            log_warning("backup env crc ok. ");
-            return 0;
+        
+    /*如果环境变量是有效的而备份环境变量是无效的 那么就从环境变量恢复到备份环境变量*/
+    } else if (rc == 0 && rc_backup != 0) {
+        device_env_backup = device_env;
+        rc_backup = device_env_write(DEVICE_ENV_BACKUP_BASE_ADDR,(uint8_t*)&device_env_backup,sizeof(device_env_t));
+        if (rc_backup != 0) {
+           log_error("recovery backup env err.\r\n");
+           return -1;
         }
-        log_warning("backup crc bad. ");
-#endif
-        /*如果环境变量无效 初始化为0*/
-        memset(&device_env,0x00,sizeof(device_env_t));
+        log_warning("recovery backup env ok.\r\n");
+        
+    /*如果备份环境变量是有效的而环境变量是无效的 那么就从备份环境变量恢复到环境变量*/
+    } else if (rc != 0 && rc_backup == 0) {
+        device_env = device_env_backup;
+        rc_backup = device_env_write(DEVICE_ENV_BASE_ADDR,(uint8_t*)&device_env,sizeof(device_env_t));
+        if (rc_backup != 0) {
+           log_error("recovery env err.\r\n");
+           return -1;
+        }            
+        log_warning("recovery env ok.\r\n");  
+        
+    /*两者都是无效的 环境变量初始化为0*/  
     } else {
-        log_warning("env crc ok. ");
+        memset(&device_env,0x00,sizeof(device_env_t));
+        log_warning("all env bad.clear env.\r\n");  
     }
+#else
+    if (rc == 0) {
+        log_warning("env ok.");
+    } else {
+        memset(&device_env,0x00,sizeof(device_env_t));
+        log_warning("env bad.clear.\r\n");          
+    }    
+#endif
 
     return 0;
 }
@@ -223,42 +304,23 @@ int device_env_flush(void)
     int rc;
 
     memset(&device_env,0x00,sizeof(device_env_t));
-
-#if DEVICE_ENV_USE_EEPROM > 0
-    rc = eeprom_if_write(DEVICE_ENV_BASE_ADDR,(uint8_t*)&device_env,sizeof(device_env_t));
-#else
-    rc = flash_if_erase(DEVICE_ENV_BASE_ADDR,sizeof(device_env_t));
-    if (rc != 0) {
-        log_error("do flush err.\r\n");
-        return -1;
-    }
-    rc = flash_if_write(DEVICE_ENV_BASE_ADDR,(uint8_t*)&device_env,sizeof(device_env_t));
-#endif
-
+    /*写入环境变量*/
+    rc = device_env_write(DEVICE_ENV_BASE_ADDR,(uint8_t*)&device_env,sizeof(device_env_t));
     if (rc != 0) {
         log_error("do flush err.\r\n");
         return -1;
     }
 
-#if DEVICE_ENV_USE_BACKUP > 0  /*环境变量备份*/
-#if DEVICE_ENV_USE_EEPROM > 0
-    rc = eeprom_if_write(DEVICE_ENV_BACKUP_BASE_ADDR,(uint8_t*)&device_env,sizeof(device_env_t));
-#else
-    rc = flash_if_erase(DEVICE_ENV_BACKUP_BASE_ADDR,sizeof(device_env_t));
+#if DEVICE_ENV_USE_BACKUP > 0  
+    /*写入环境变量备份*/
+    rc = device_env_write(DEVICE_ENV_BACKUP_BASE_ADDR,(uint8_t*)&device_env,sizeof(device_env_t));
     if (rc != 0) {
         log_error("do backup flush err.\r\n");
         return -1;
     }
-    rc = flash_if_write(DEVICE_ENV_BACKUP_BASE_ADDR,(uint8_t*)&device_env,sizeof(device_env_t));
-#endif
-    if (rc != 0) {
-        log_error("do backup flush err.\r\n");
-        return -1;
-    }
-
 #endif
 
-    log_debug("do flush ok.\r\n");
+    log_warning("do flush ok.\r\n");
 
     return 0;
 }

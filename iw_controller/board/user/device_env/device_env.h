@@ -26,8 +26,8 @@ extern "C" {
 /*使用eeprom*/
 #if  DEVICE_ENV_USE_EEPROM  > 0
 #define  DEVICE_ENV_BASE_ADDR                  0x40108000   /*环境变量基地址*/   
-#define  DEVICE_ENV_BACKUP_BASE_ADDR           0x40108100   /*环境变量备份基地址*/      
-#define  DEVICE_ENV_SIZE_LIMIT                 0x100        /*环境变量大小*/ 
+#define  DEVICE_ENV_BACKUP_BASE_ADDR           0x40108200   /*环境变量备份基地址*/      
+#define  DEVICE_ENV_SIZE_LIMIT                 0x200        /*环境变量大小*/ 
 /*使用flash*/
 #else
 
