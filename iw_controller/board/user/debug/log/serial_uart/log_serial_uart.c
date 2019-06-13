@@ -106,7 +106,7 @@ int log_serial_uart_write(char *src,int size)
 * @return 无
 * @note
 */
-void FLEXCOMM0_IRQHandler()
+void FLEXCOMM9_IRQHandler()
 {
     if (log_serial_uart_handle.registered && log_serial_uart_handle.init) {
         nxp_serial_uart_hal_isr(&log_serial_uart_handle);

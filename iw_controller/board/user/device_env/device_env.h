@@ -108,12 +108,12 @@ extern "C" {
 int device_env_init(void);
 
 /*
-* @brief 环境变量冲刷
+* @brief 环境变量完全清除
 * @param 无
 * @return 0：成功 -1：失败
 * @note
 */
-int device_env_flush(void);
+int device_env_clear(void);
 
 /*
 * @brief 获取对应名称的环境变量值

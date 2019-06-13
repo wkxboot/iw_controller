@@ -14,10 +14,10 @@
 
 
 #define  LOG_UART_RX_BUFFER_SIZE              32
-#define  LOG_UART_TX_BUFFER_SIZE              4096
+#define  LOG_UART_TX_BUFFER_SIZE              1024
 
 
-#define  LOG_UART_PORT                        0
+#define  LOG_UART_PORT                        2
 #define  LOG_UART_BAUD_RATES                  115200
 #define  LOG_UART_DATA_BITS                   8
 #define  LOG_UART_STOP_BITS                   1

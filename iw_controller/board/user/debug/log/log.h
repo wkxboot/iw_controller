@@ -39,9 +39,8 @@
 
 #define  LOG_ERROR_COLOR           LOG_COLOR_RED
 #define  LOG_WARNING_COLOR         LOG_COLOR_MAGENTA
-#define  LOG_INFO_COLOR            LOG_COLOR_GREEN
-#define  LOG_DEBUG_COLOR           LOG_COLOR_YELLOW
-#define  LOG_ARRAY_COLOR           LOG_COLOR_CYAN
+#define  LOG_INFO_COLOR            LOG_COLOR_YELLOW
+#define  LOG_DEBUG_COLOR           LOG_COLOR_GREEN
 
 /******************************************************************************/
 /*    配置结束                                                                */
@@ -53,13 +52,11 @@
 #undef LOG_WARNING_COLOR
 #undef LOG_INFO_COLOR
 #undef LOG_DEBUG_COLOR 
-#undef LOG_ARRAY_COLOR
 
 #define LOG_USE_COLORS
 #define LOG_WARNING_COLOR
 #define LOG_INFO_COLOR
 #define LOG_DEBUG_COLOR 
-#define LOG_ARRAY_COLOR
 
 #endif 
 
@@ -72,15 +69,14 @@
 #define LOG_TIME_FORMAT        "[%1d]"
 #endif
 
-#define  LOG_FILE_NAME_FORMAT  " %s | "
-#define  LOG_LINE_NUM_FORMAT   "%d "
+#define  LOG_FILE_NAME_FORMAT  " %s"
+#define  LOG_LINE_NUM_FORMAT   " %d $ "
 
 
-#define LOG_ERROR_PREFIX_FORMAT       "\r\n"LOG_ERROR_COLOR   LOG_TIME_FORMAT   "[error]"   LOG_FILE_NAME_FORMAT LOG_LINE_NUM_FORMAT "\r\n"
-#define LOG_WARNING_PREFIX_FORMAT     "\r\n"LOG_WARNING_COLOR LOG_TIME_FORMAT   "[warning]" LOG_FILE_NAME_FORMAT LOG_LINE_NUM_FORMAT "\r\n"
-#define LOG_INFO_PREFIX_FORMAT        "\r\n"LOG_INFO_COLOR    LOG_TIME_FORMAT   "[info]"    LOG_FILE_NAME_FORMAT LOG_LINE_NUM_FORMAT "\r\n"
-#define LOG_DEBUG_PREFIX_FORMAT       "\r\n"LOG_DEBUG_COLOR   LOG_TIME_FORMAT   "[debug]"   LOG_FILE_NAME_FORMAT LOG_LINE_NUM_FORMAT "\r\n"
-#define LOG_ARRAY_PREFIX_FORMAT       "\r\n"LOG_ARRAY_COLOR   LOG_TIME_FORMAT   "[array]"   LOG_FILE_NAME_FORMAT LOG_LINE_NUM_FORMAT "\r\n"
+#define LOG_ERROR_PREFIX_FORMAT       LOG_ERROR_COLOR   LOG_TIME_FORMAT   "[error]"   LOG_FILE_NAME_FORMAT LOG_LINE_NUM_FORMAT
+#define LOG_WARNING_PREFIX_FORMAT     LOG_WARNING_COLOR LOG_TIME_FORMAT   "[warning]" LOG_FILE_NAME_FORMAT LOG_LINE_NUM_FORMAT
+#define LOG_INFO_PREFIX_FORMAT        LOG_INFO_COLOR    LOG_TIME_FORMAT   "[info]"    LOG_FILE_NAME_FORMAT LOG_LINE_NUM_FORMAT
+#define LOG_DEBUG_PREFIX_FORMAT       LOG_DEBUG_COLOR   LOG_TIME_FORMAT   "[debug]"   LOG_FILE_NAME_FORMAT LOG_LINE_NUM_FORMAT
 
 #define LOG_PREFIX_VALUE              LOG_TIME_VALUE,__FILE__,__LINE__ 
 

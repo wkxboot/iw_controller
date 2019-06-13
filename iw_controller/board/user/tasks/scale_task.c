@@ -188,13 +188,16 @@ static int build_adu(uint8_t *adu,uint8_t addr,uint8_t code,uint8_t *value,uint8
 static int send_adu(serial_handle_t *handle,const uint8_t *adu,const uint8_t size,const uint16_t timeout)
 {
     uint16_t write_size,write_size_total;
- 
+    char buffer[ADU_SIZE_MAX * 2 + 1];
+
     serial_flush(handle);
     write_size = size;
     write_size_total = serial_write(handle,(const char*)adu,write_size);
-    for (int i=0; i < write_size_total; i++){
-        log_debug("[%2X]\r\n", adu[i]);
-    }
+
+    /*打印输出的数据*/
+    dump_hex_str((const char *)adu,buffer,write_size_total);
+    log_debug("[send] %s\r\n",buffer);
+
     if (write_size_total != write_size){
         log_error("scale err in  serial buffer write. expect:%d write:%d.\r\n",write_size,write_size_total); 
         return -1;    
@@ -240,11 +243,6 @@ static int receive_adu(serial_handle_t *handle,uint8_t *adu,uint32_t wait_timeou
         if (rc == -1) {
             log_error("adu read error.read total:%d. read size:%d.\r\n",read_size_total,read_size);
             return -1;
-        }
-   
-        /*打印接收的数据*/
-        for (int i = 0;i < rc;i++){
-            log_debug("<%2X>\r\n", adu[read_size_total + i]);
         }
    
         read_size_total += rc;

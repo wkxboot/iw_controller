@@ -916,10 +916,11 @@ static int process_update(application_update_t *update,uint32_t timeout)
     char size_str_buffer[SIZE_STR_BUFFER];
 
     int size = 0;
-    
+
+    log_info("start process update...\r\n");
     size = fymodem_receive(&communication_serial_handle,APPLICATION_UPDATE_BASE_ADDR,APPLICATION_SIZE_LIMIT,file_name,timeout);
     if (size > 0) {
-        log_debug("update file_name:%s.\r\n",file_name);
+        log_info("update file_name:%s.\r\n",file_name);
         if (size != update->size) {
             log_error("file ymodem get size:%d != notify size:%d.\r\n",size,update->size);
             return -1;
@@ -935,23 +936,23 @@ static int process_update(application_update_t *update,uint32_t timeout)
         /*int转换成字符串*/
         snprintf(size_str_buffer,SIZE_STR_BUFFER,"%d",size);
 
-        log_debug("check update size:%s md5:%s ok.\r\n",size_str_buffer,md5_str_buffer);
+        log_info("check update size:%s md5:%s ok.\r\n",size_str_buffer,md5_str_buffer);
 
         /*设置更新size*/
-        log_debug("set update size env...\r\n");
+        log_info("set update size env...\r\n");
         if (device_env_set(ENV_BOOTLOADER_UPDATE_SIZE_NAME,size_str_buffer) != 0) {
             return -1;
         }
         /*设置更新md5*/
-        log_debug("set update md5 env...\r\n");
+        log_info("set update md5 env...\r\n");
         if (device_env_set(ENV_BOOTLOADER_UPDATE_MD5_NAME,md5_str_buffer)!= 0) {
             return -1;
         }
-        log_debug("set flag new env...\r\n");
+        log_info("set flag new env...\r\n");
         /*设置更新标志*/
         device_env_set(ENV_BOOTLOADER_FLAG_NAME,ENV_BOOTLOADER_NEW);
 
-        log_debug("all done. reboot...\r\n");
+        log_info("all done. reboot...\r\n");
         /*禁止看门狗*/
         WWDT_Deinit(WWDT);
         /*复位准备升级*/
@@ -977,43 +978,48 @@ static int process_update(application_update_t *update,uint32_t timeout)
 */
 static int receive_adu(serial_handle_t *handle,uint8_t *adu,uint8_t size,uint32_t timeout)
 {
-    int rc;
+    int rc = -1;
     int read_size,read_size_total = 0;
+    char buffer[ADU_SIZE_MAX * 2 + 1];
 
     while (read_size_total < size) {
         rc = serial_select(handle,timeout);
         if (rc == -1) {
             log_error("adu select error.read total:%d.\r\n",read_size_total);
-            return -1;
+            goto exit;
         }
         /*读完了一帧数据*/
         if (rc == 0) {
-            log_debug("adu recv over.read size total:%d.\r\n",read_size_total);
-            return read_size_total;
+           goto exit;
+        
         }
         /*数据溢出*/
         if (rc > size - read_size_total) {
             log_error("adu size:%d too large than buffer size:%d .error.\r\n",read_size_total + rc,size);
-            return -1;
+            goto exit;
         }
         read_size = rc;
         rc = serial_read(handle,(char *)adu + read_size_total,read_size);
         if (rc == -1) {
             log_error("adu read error.read total:%d.\r\n",read_size_total);
-            return -1;
+            goto exit;
         }
    
-        /*打印接收的数据*/
-        for (int i = 0;i < rc;i++){
-            log_array("<%2X>\r\n", adu[read_size_total + i]);
-        }
         /*更新接收数量*/
         read_size_total += rc;
         /*超时时间变为帧超时间*/
         timeout = ADU_FRAME_TIMEOUT;
     }
 
-    log_error("adu recv unknow err.\r\n");
+exit:
+    /*打印接收的数据*/
+    dump_hex_str((char *const)adu,buffer,read_size_total);
+    log_debug("[recv] %s\r\n",buffer);
+
+    if (rc == 0) {
+        log_debug("adu recv over.read size total:%d.\r\n",read_size_total);
+        return read_size_total;
+    }
     return -1;
 }
 
@@ -1321,11 +1327,14 @@ static int parse_adu(uint8_t *adu,uint8_t size,uint8_t *rsp,application_update_t
 static int send_adu(serial_handle_t *handle,uint8_t *adu,uint8_t size,uint32_t timeout)
 {
     uint8_t write_size;
+    char buffer[ADU_SIZE_MAX * 2 + 1];
 
     write_size = serial_write(handle,(char *)adu,size);
-    for (int i = 0; i < write_size; i++){
-        log_array("[%2X]\r\n",adu[i]);
-    }
+
+    /*打印输出的数据*/
+    dump_hex_str((char *const)adu,buffer,write_size);
+    log_debug("[send] %s\r\n",buffer);
+
     if (size != write_size){
         log_error("communication err in  serial write. expect:%d write:%d.\r\n",size,write_size); 
         return -1;      

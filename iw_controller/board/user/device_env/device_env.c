@@ -177,6 +177,8 @@ static int device_env_write(uint32_t addr,uint8_t *src,uint32_t size)
 static int device_env_do_save(void) 
 {
     int rc;
+
+    log_debug("do save...\r\n");
     /*保存环境变量*/
     rc = device_env_write(DEVICE_ENV_BASE_ADDR,(uint8_t*)&device_env,sizeof(device_env_t));
     if (rc != 0) {
@@ -192,7 +194,7 @@ static int device_env_do_save(void)
     }    
 #endif
 
-    log_warning("do save ok.\r\n");
+    log_debug("do save ok.\r\n");
     return 0;
 }
 
@@ -209,6 +211,7 @@ int device_env_init(void)
     int rc_backup;
 #endif
     
+    log_info("device env init...\r\n");
     /*初始化接口*/
 #if DEVICE_ENV_USE_EEPROM > 0
     rc = eeprom_if_init();
@@ -220,7 +223,7 @@ int device_env_init(void)
         log_error("env if init err.\r\n");
         return -1;
     }
-    log_warning("read env...\r\n");    
+    log_debug("read env...\r\n");    
     /*读取环境变量*/
     rc = device_env_read(DEVICE_ENV_BASE_ADDR,(uint8_t*)&device_env,sizeof(device_env_t));
     if (rc != 0) {
@@ -232,7 +235,7 @@ int device_env_init(void)
 
 #if DEVICE_ENV_USE_BACKUP > 0 
     /*读取备份环境变量*/
-    log_warning("read backup env...\r\n");
+    log_debug("read backup env...\r\n");
     rc_backup = device_env_read(DEVICE_ENV_BACKUP_BASE_ADDR,(uint8_t*)&device_env_backup,sizeof(device_env_t));
     if (rc_backup != 0) {
         log_error("read backup env err.\r\n");
@@ -243,7 +246,7 @@ int device_env_init(void)
     
     /*如果两者都是有效的*/
     if (rc == 0 && rc_backup == 0) {
-        log_warning("all env ok.");
+        log_info("all env ok.\r\n");
         /*检查两者是否一致 如果不一致 那么环境变量应该是最新的*/
         if (device_env.crc != device_env_backup.crc) {
             device_env_backup = device_env;
@@ -253,7 +256,7 @@ int device_env_init(void)
                log_error("sync backup env err.\r\n");
                return -1;
             }
-            log_warning("sync backup env ok.\r\n");
+            log_info("sync backup env ok.\r\n");
         }
         
     /*如果环境变量是有效的而备份环境变量是无效的 那么就从环境变量恢复到备份环境变量*/
@@ -264,7 +267,7 @@ int device_env_init(void)
            log_error("recovery backup env err.\r\n");
            return -1;
         }
-        log_warning("recovery backup env ok.\r\n");
+        log_info("recovery backup env ok.\r\n");
         
     /*如果备份环境变量是有效的而环境变量是无效的 那么就从备份环境变量恢复到环境变量*/
     } else if (rc != 0 && rc_backup == 0) {
@@ -274,40 +277,43 @@ int device_env_init(void)
            log_error("recovery env err.\r\n");
            return -1;
         }            
-        log_warning("recovery env ok.\r\n");  
+        log_info("recovery env ok.\r\n");  
         
     /*两者都是无效的 环境变量初始化为0*/  
     } else {
         memset(&device_env,0x00,sizeof(device_env_t));
-        log_warning("all env bad.clear env.\r\n");  
+        log_info("all env bad.clear env.\r\n");  
     }
 #else
     if (rc == 0) {
-        log_warning("env ok.");
+        log_info("env ok.");
     } else {
         memset(&device_env,0x00,sizeof(device_env_t));
-        log_warning("env bad.clear.\r\n");          
+        log_info("env bad.cleared.\r\n");          
     }    
 #endif
 
+    log_info("device env init ok.\r\n");
     return 0;
 }
 
 /*
-* @brief 环境变量冲刷
+* @brief 环境变量完全清除
 * @param 无
 * @return 0：成功 -1：失败
 * @note
 */
-int device_env_flush(void) 
+int device_env_clear(void) 
 {
     int rc;
+
+    log_info("clear env...\r\n");
 
     memset(&device_env,0x00,sizeof(device_env_t));
     /*写入环境变量*/
     rc = device_env_write(DEVICE_ENV_BASE_ADDR,(uint8_t*)&device_env,sizeof(device_env_t));
     if (rc != 0) {
-        log_error("do flush err.\r\n");
+        log_error("clear env err.\r\n");
         return -1;
     }
 
@@ -315,12 +321,12 @@ int device_env_flush(void)
     /*写入环境变量备份*/
     rc = device_env_write(DEVICE_ENV_BACKUP_BASE_ADDR,(uint8_t*)&device_env,sizeof(device_env_t));
     if (rc != 0) {
-        log_error("do backup flush err.\r\n");
+        log_error("clear backup env err.\r\n");
         return -1;
     }
 #endif
 
-    log_warning("do flush ok.\r\n");
+    log_info("clear env ok.\r\n");
 
     return 0;
 }
@@ -367,7 +373,7 @@ int device_env_set(char *name,char *value)
     char *env_data = device_env_get_addr(0);
 
     if (strchr(name, '=')) {
-        log_error("## Error: illegal character '=' in variable name \"%s\"\n", name);
+        log_error("Error: illegal character '=' in variable name \"%s\"\n", name);
         return -1;
     }
 
@@ -425,7 +431,7 @@ int device_env_set(char *name,char *value)
     len += strlen(value) + 1;
 
     if (len > (&env_data[DEVICE_ENV_DATA_SIZE_LIMIT] - env)) {
-        log_error("## Error: environment overflow, \"%s\" deleted\n", name);
+        log_error("Error: environment overflow, \"%s\" deleted\n", name);
         return 1;
     }
     while ((*env = *name++) != '\0') {

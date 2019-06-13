@@ -8,7 +8,6 @@
 #include "temperature_task.h"
 #include "compressor_task.h"
 #include "communication_task.h"
-#include "firmware_version.h"
 #include "log.h"
 
 /*
@@ -81,9 +80,6 @@ void tasks_init(void)
     osThreadDef(communication_task, communication_task, osPriorityNormal, 0, 400);
     communication_task_hdl = osThreadCreate(osThread(communication_task), NULL);
     log_assert(communication_task_hdl);
-
-
-    log_info("iw controller firmware version: %s.\r\n",FIRMWARE_VERSION_STR);
 
 }
 

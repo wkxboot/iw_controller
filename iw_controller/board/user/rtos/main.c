@@ -35,6 +35,7 @@
 #include "board.h"
 #include "tasks_init.h"
 #include "device_env.h"
+#include "firmware_version.h"
 #include "log.h"
 
 
@@ -74,6 +75,7 @@ int main(void)
 
     bsp_board_init();
     log_init();
+    log_info("iw controller firmware version: %s.\r\n",FIRMWARE_VERSION_STR);
 
     /*环境变量初始化*/
     device_env_init();
@@ -83,9 +85,9 @@ int main(void)
 
     /*第一次运行*/
     if (flag == NULL) {
-        log_warning("first boot.set init...\r\n");
+        log_info("first boot.set init...\r\n");
         device_env_set(ENV_BOOTLOADER_FLAG_NAME,ENV_BOOTLOADER_INIT);
-        log_warning("done.reboot...\r\n");
+        log_info("done.reboot...\r\n");
         /*主动复位*/
         hal_delay();
         __NVIC_SystemReset();
@@ -94,9 +96,9 @@ int main(void)
     if (flag) {
         /*如果是更新后第一次运行 就置为OK*/
         if (strcmp(flag,ENV_BOOTLOADER_COMPLETE) == 0) {
-            log_warning("update first boot.set ok...\r\n");
+            log_info("update first boot.set ok...\r\n");
             device_env_set(ENV_BOOTLOADER_FLAG_NAME,ENV_BOOTLOADER_OK);
-            log_warning("done.\r\n");
+            log_info("done.\r\n");
         }
 
     }

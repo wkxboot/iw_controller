@@ -55,12 +55,12 @@ void debug_task(void const * argument)
                 log_error("debug put lock msg err:%d.\r\n",status);
             }
         }
-        /*flush eeprom*/
-        if (strncmp(cmd,"flush",strlen("flush")) == 0) {
-            if (device_env_flush() == 0) {
-                log_debug("flush env ok.\r\n");
+        /*clear eeprom*/
+        if (strncmp(cmd,"clear",strlen("clear")) == 0) {
+            if (device_env_clear() == 0) {
+                log_info("clear env ok.\r\n");
             } else {
-                log_error("flush env err.\r\n");
+                log_error("clear env err.\r\n");
             }
         } 
  
