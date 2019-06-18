@@ -48,11 +48,14 @@ void WDT_BOD_IRQHandler(void)
     /* Handle warning interrupt */
     if (wdtStatus & kWWDT_WarningFlag)
     {
-        log_debug("feed dog.v:%d.\r\n",WWDT->TV);
-        /* A watchdog feed didn't occur prior to warning timeout */
-        WWDT_ClearStatusFlags(WWDT, kWWDT_WarningFlag);
+        log_debug("feed dog.tv:%d.\r\n",WWDT->TV);
+
+        while (WWDT->TV >= WWDT->WARNINT);
        /* Feed only for the first 5 warnings then allow for a WDT reset to occur */
         WWDT_Refresh(WWDT);
+        while (WWDT->TV < WWDT->WARNINT);
+        /* A watchdog feed didn't occur prior to warning timeout */
+        WWDT_ClearStatusFlags(WWDT, kWWDT_WarningFlag);
     }
        
 
