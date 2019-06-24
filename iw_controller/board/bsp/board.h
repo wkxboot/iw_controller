@@ -57,8 +57,8 @@ extern "C" {
 #define  BSP_LOCK_UNLOCKED_LEVEL            0
 #define  BSP_LOCK_LOCKED_LEVEL              1
 
-#define  BSP_HOLE_OPEN_LEVEL                0
-#define  BSP_HOLE_CLOSE_LEVEL               1
+#define  BSP_HOLE_OPEN_LEVEL                1
+#define  BSP_HOLE_CLOSE_LEVEL               0
 
 #define  BSP_DOOR_OPEN_LEVEL                1
 #define  BSP_DOOR_CLOSE_LEVEL               0
