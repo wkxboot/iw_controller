@@ -231,7 +231,7 @@ void lock_task(void const *argument)
             /*执行开锁操作*/
             bsp_lock_ctrl_open();
 
-            utils_timer_init(&timer,LOCK_TASK_LOCK_TIMEOUT,false);
+            utils_timer_init(&timer,LOCK_TASK_UNLOCK_TIMEOUT,false);
 
             while (utils_timer_value(&timer) > 0 && (lock_controller.lock_sensor.status != BSP_LOCK_STATUS_UNLOCKED || lock_controller.hole_sensor.status != BSP_HOLE_STATUS_OPEN) ){
                 osDelay(10);

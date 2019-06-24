@@ -106,8 +106,8 @@ static communication_task_contex_t communication_task_contex;
 #define  ADU_REMOVE_TARE_TIMEOUT                    510
 #define  ADU_CALIBRATION_ZERO_TIMEOUT               510
 #define  ADU_CALIBRATION_FULL_TIMEOUT               510
-#define  ADU_LOCK_RSP_TIMEOUT                       850
-#define  ADU_UNLOCK_RSP_TIMEOUT                     850
+#define  ADU_LOCK_RSP_TIMEOUT                       990
+#define  ADU_UNLOCK_RSP_TIMEOUT                     990
 #define  ADU_QUERY_DOOR_STATUS_TIMEOUT              40
 #define  ADU_QUERY_LOCK_STATUS_TIMEOUT              40
 #define  ADU_QUERY_TEMPERATURE_TIMEOUT              20

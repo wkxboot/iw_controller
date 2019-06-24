@@ -18,9 +18,7 @@
 osThreadId   watch_dog_task_hdl;
 
 
-#define  WDT_ENABLE  1
-
-#if  WDT_ENABLE  > 0 
+#define  WDT_ENABLE_RESET      1
 
 #define WDT_CLK_FREQ CLOCK_GetFreq(kCLOCK_WdtOsc)
 /*
@@ -52,7 +50,6 @@ void WDT_BOD_IRQHandler(void)
 #endif
 }
 
-#endif
 
 
 /*
@@ -66,7 +63,6 @@ void WDT_BOD_IRQHandler(void)
 void watch_dog_task(void const * argument)
 {
 
-#if  WDT_ENABLE  > 0 
     wwdt_config_t config;
     uint32_t wdtFreq;
     /* Enable clock of wwdt. */
@@ -98,13 +94,15 @@ void watch_dog_task(void const * argument)
     config.timeoutValue = wdtFreq * 5;
     config.warningValue = 1023;
     config.windowValue = wdtFreq * 4;
-    /* Configure WWDT to reset on timeout */
+#if  WDT_ENABLE_RESET  > 0 
     config.enableWatchdogReset = true;
+#else
+    config.enableWatchdogReset = false;
+#endif
     /* Setup watchdog clock frequency(Hz). */
     config.clockFreq_Hz = WDT_CLK_FREQ;
 
     WWDT_Init(WWDT, &config);
-#endif
 
     while (1){
         osDelay(WATCH_DOG_TASK_INTERVAL); 
