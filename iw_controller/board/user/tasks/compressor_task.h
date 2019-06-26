@@ -36,7 +36,7 @@ void compressor_task(void const *argument);
 #define  COMPRESSOR_TASK_TEMPERATURE_SETTING_MAX       28/*目标温度可设置的最高值*/
 #define  COMPRESSOR_TASK_TEMPERATURE_SETTING_DEFAULT   6 /*默认目标温度值*/
 
-#define  COMPRESSOR_TASK_TEMPERATURE_MIN               0 /*压缩机能够达到的最低温度*/
+#define  COMPRESSOR_TASK_TEMPERATURE_MIN               -2/*压缩机能够达到的最低温度*/
 #define  COMPRESSOR_TASK_TEMPERATURE_MAX               30/*压缩机能够达到的最高温度*/
 
 #define  COMPRESSOR_TASK_TEMPERATURE_ENV_NAME          "temperature"
