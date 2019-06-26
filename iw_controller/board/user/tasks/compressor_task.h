@@ -31,10 +31,13 @@ void compressor_task(void const *argument);
 #define  COMPRESSOR_TASK_SUCCESS                       0
 #define  COMPRESSOR_TASK_FAIL                          1
 
-#define  COMPRESSOR_TASK_TEMPERATURE_OFFSET            2
-#define  COMPRESSOR_TASK_TEMPERATURE_SETTING_MIN       0
-#define  COMPRESSOR_TASK_TEMPERATURE_SETTING_MAX       30
-#define  COMPRESSOR_TASK_TEMPERATURE_SETTING_DEFAULT   6
+#define  COMPRESSOR_TASK_TEMPERATURE_OFFSET            2 /*目标温度的浮动值*/
+#define  COMPRESSOR_TASK_TEMPERATURE_SETTING_MIN       0 /*目标温度可设置的最低值*/
+#define  COMPRESSOR_TASK_TEMPERATURE_SETTING_MAX       28/*目标温度可设置的最高值*/
+#define  COMPRESSOR_TASK_TEMPERATURE_SETTING_DEFAULT   6 /*默认目标温度值*/
+
+#define  COMPRESSOR_TASK_TEMPERATURE_MIN               0 /*压缩机能够达到的最低温度*/
+#define  COMPRESSOR_TASK_TEMPERATURE_MAX               30/*压缩机能够达到的最高温度*/
 
 #define  COMPRESSOR_TASK_TEMPERATURE_ENV_NAME          "temperature"
 

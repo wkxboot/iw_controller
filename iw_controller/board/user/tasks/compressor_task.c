@@ -51,8 +51,8 @@ typedef struct
 static compressor_t compressor ={
 .status = COMPRESSOR_STATUS_INIT,
 .setting = COMPRESSOR_TASK_TEMPERATURE_SETTING_DEFAULT,
-.temperature_stop = COMPRESSOR_TASK_TEMPERATURE_SETTING_DEFAULT - 2,
-.temperature_work = COMPRESSOR_TASK_TEMPERATURE_SETTING_DEFAULT + 2,
+.temperature_stop = COMPRESSOR_TASK_TEMPERATURE_SETTING_DEFAULT - COMPRESSOR_TASK_TEMPERATURE_OFFSET,
+.temperature_work = COMPRESSOR_TASK_TEMPERATURE_SETTING_DEFAULT + COMPRESSOR_TASK_TEMPERATURE_OFFSET,
 .temperature_err = false
 };
 
@@ -176,11 +176,11 @@ void compressor_task(void const *argument)
         log_info("setting not exsit in flash.default:%d.\r\n",compressor.setting);
     } else {
         setting = atoi(temperature_str);
-        if ((setting - COMPRESSOR_TASK_TEMPERATURE_OFFSET) >= COMPRESSOR_TASK_TEMPERATURE_SETTING_MIN || (setting + COMPRESSOR_TASK_TEMPERATURE_OFFSET) <= COMPRESSOR_TASK_TEMPERATURE_SETTING_MAX) {
+        if (setting >= COMPRESSOR_TASK_TEMPERATURE_SETTING_MIN || setting <= COMPRESSOR_TASK_TEMPERATURE_SETTING_MAX) {
             log_info("setting:%d exsit in flash.valid.\r\n",setting);
             compressor.setting = setting;
-            compressor.temperature_work = setting + COMPRESSOR_TASK_TEMPERATURE_OFFSET;
-            compressor.temperature_stop = setting - COMPRESSOR_TASK_TEMPERATURE_OFFSET;
+            compressor.temperature_work = setting + COMPRESSOR_TASK_TEMPERATURE_OFFSET > COMPRESSOR_TASK_TEMPERATURE_MAX ? COMPRESSOR_TASK_TEMPERATURE_MAX : setting + COMPRESSOR_TASK_TEMPERATURE_OFFSET;
+            compressor.temperature_stop = setting - COMPRESSOR_TASK_TEMPERATURE_OFFSET < COMPRESSOR_TASK_TEMPERATURE_MIN ? COMPRESSOR_TASK_TEMPERATURE_MIN : setting - COMPRESSOR_TASK_TEMPERATURE_OFFSET;
         } else {
             log_info("setting exsit in flash invalid.default:%d.\r\n",compressor.setting);
         }
@@ -324,8 +324,8 @@ void compressor_task(void const *argument)
         /*配置压缩机工作温度区间消息*/
         if (req_msg.request.type == COMPRESSOR_TASK_MSG_TYPE_TEMPERATURE_SETTING){ 
             setting = req_msg.request.temperature_setting;
-            if (setting - COMPRESSOR_TASK_TEMPERATURE_OFFSET < COMPRESSOR_TASK_TEMPERATURE_SETTING_MIN ||\
-                setting + COMPRESSOR_TASK_TEMPERATURE_OFFSET > COMPRESSOR_TASK_TEMPERATURE_SETTING_MAX) {
+            if (setting < COMPRESSOR_TASK_TEMPERATURE_SETTING_MIN ||\
+                setting > COMPRESSOR_TASK_TEMPERATURE_SETTING_MAX) {
                 rsp_setting_msg.response.result = COMPRESSOR_TASK_FAIL;
                 log_error("温度设置值:%d ± %d C无效.min:%d C max:%d C.\r\n.",
                             setting,
@@ -336,8 +336,8 @@ void compressor_task(void const *argument)
                 rsp_setting_msg.response.result = COMPRESSOR_TASK_SUCCESS;
                 if (compressor.setting != setting) {
                     /*复制当前温度区间到缓存*/
-                    compressor.temperature_work = setting + COMPRESSOR_TASK_TEMPERATURE_OFFSET;
-                    compressor.temperature_stop = setting - COMPRESSOR_TASK_TEMPERATURE_OFFSET;  
+                    compressor.temperature_work = setting + COMPRESSOR_TASK_TEMPERATURE_OFFSET > COMPRESSOR_TASK_TEMPERATURE_MAX ? COMPRESSOR_TASK_TEMPERATURE_MAX : setting + COMPRESSOR_TASK_TEMPERATURE_OFFSET;;
+                    compressor.temperature_stop = setting - COMPRESSOR_TASK_TEMPERATURE_OFFSET < COMPRESSOR_TASK_TEMPERATURE_MIN ? COMPRESSOR_TASK_TEMPERATURE_MIN : setting - COMPRESSOR_TASK_TEMPERATURE_OFFSET; 
                     compressor.setting = setting;
                     snprintf(temperature_str_buffer,7,"%d",setting);
                     rc = device_env_set(COMPRESSOR_TASK_TEMPERATURE_ENV_NAME,temperature_str_buffer);
@@ -345,7 +345,7 @@ void compressor_task(void const *argument)
                         rsp_setting_msg.response.result = COMPRESSOR_TASK_FAIL;
                         log_error("save temperature setting fail.\r\n");
                     } else {                                
-                        log_debug("温度设置值:%dC成功.区间%dC~%dC.\r\n",setting,compressor.temperature_stop,compressor.temperature_work);
+                        log_debug("温度设置值:%dC成功.区间%.2fC~%.2fC.\r\n",setting,compressor.temperature_stop,compressor.temperature_work);
                         /*发送消息更新压缩机工作状态*/
                         req_update_msg.request.type = COMPRESSOR_TASK_MSG_TYPE_UPDATE_STATUS;
                         status = osMessagePut(compressor_task_msg_q_id,(uint32_t)&req_update_msg,COMPRESSOR_TASK_PUT_MSG_TIMEOUT);
