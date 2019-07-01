@@ -94,9 +94,11 @@ static void bsp_unlock_sw_pin_init()
 /*手动开锁按键状态*/
 uint8_t bsp_unlock_sw_status()
 {
-    uint8_t pin_level,status;
+    uint8_t pin_level,pin_level_main,status;
     pin_level = GPIO_PinRead(BOARD_INITPINS_UNLOCK_SW_GPIO,BOARD_INITPINS_UNLOCK_SW_PORT,BOARD_INITPINS_UNLOCK_SW_PIN);
-    if (pin_level == BSP_UNLOCK_SW_STATUS_PRESS_LEVEL) {
+    pin_level_main = GPIO_PinRead(BOARD_INITPINS_UNLOCK_SW_MAIN_GPIO,BOARD_INITPINS_UNLOCK_SW_MAIN_PORT,BOARD_INITPINS_UNLOCK_SW_MAIN_PIN);
+    /*使用2个按键，只要有一个按键按下就认为是有效按压*/
+    if (pin_level == BSP_UNLOCK_SW_STATUS_PRESS_LEVEL || pin_level_main == BSP_UNLOCK_SW_STATUS_PRESS_LEVEL) {
         status = BSP_UNLOCK_SW_STATUS_PRESS;
     } else {
         status = BSP_UNLOCK_SW_STATUS_RELEASE;

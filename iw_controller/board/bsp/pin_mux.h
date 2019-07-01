@@ -117,6 +117,12 @@ void BOARD_InitBootPins(void);
 #define BOARD_INITPINS_UNLOCK_SW_PORT 0U   /*!<@brief PORT device name: 0U */
 #define BOARD_INITPINS_UNLOCK_SW_PIN 4U    /*!<@brief 0U pin index: 4 */
                                            /* @} */
+/*! @name PIO1_3 (number 87), UNLOCK_SW_MAIN
+  @{ */
+#define BOARD_INITPINS_UNLOCK_SW_MAIN_GPIO GPIO /*!<@brief GPIO device name: GPIO */
+#define BOARD_INITPINS_UNLOCK_SW_MAIN_PORT 1U   /*!<@brief PORT device name: 1U */
+#define BOARD_INITPINS_UNLOCK_SW_MAIN_PIN 3U    /*!<@brief 0U pin index: 3 */
+                                           /* @} */
 
 /*! @name PIO1_7 (number 18), LOCK_SENSOR
   @{ */
