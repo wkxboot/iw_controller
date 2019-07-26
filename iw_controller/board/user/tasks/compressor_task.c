@@ -364,7 +364,16 @@ void compressor_task(void const *argument)
                 log_error("compressor put rsp_setting msg timeout error:%d\r\n",status);
             }                                    
         }                         
-
+        /*压缩机调试开机消息*/
+        if (req_msg.request.type == COMPRESSOR_TASK_MSG_TYPE_DEBUG_PWR_ON){
+            /*打开压缩机*/
+            compressor_pwr_turn_on();            
+        }
+        /*压缩机调试关机机消息*/
+        if (req_msg.request.type == COMPRESSOR_TASK_MSG_TYPE_DEBUG_PWR_OFF){
+            /*关闭压缩机*/
+            compressor_pwr_turn_off();            
+        }
 
     }
     }
