@@ -49,6 +49,7 @@ static communication_task_contex_t communication_task_contex;
 #define  CODE_QUERY_MANUFACTURER_HARDWARE_VER       0x51 
 #define  CODE_QUERY_SOFTWARE_VER                    0x52
 #define  CODE_NOTIFY_UPDATE                         0x53
+#define  CODE_COMPRESSOR_CTRL                       0xF0
 /*数据域*/
 #define  ADU_DATA_REGION_OFFSET                     2
 #define  ADU_DATA_REGION_REMOVE_TARE_SIZE           1 
@@ -64,7 +65,7 @@ static communication_task_contex_t communication_task_contex;
 #define  ADU_DATA_REGION_QUERY_HARDWARE_VER_SIZE    0
 #define  ADU_DATA_REGION_QUERY_SOFTWARE_VER_SIZE    0
 #define  ADU_DATA_REGION_NOTIFY_UPDATE_SIZE         20
-
+#define  ADU_DATA_REGION_COMPRESSOR_CTRL_SIZE       1
 
 #define  DATA_REGION_SCALE_ADDR_OFFSET              0
 #define  DATA_REGION_CALIBRATION_WEIGHT_OFFSET      1
@@ -73,7 +74,7 @@ static communication_task_contex_t communication_task_contex;
 #define  DATA_REGION_FILE_SIZE_OFFSET               0
 #define  DATA_REGION_FILE_MD5_OFFSET                4
 #define  DATA_REGION_STATUS_OFFSET                  0
-
+#define  DATA_REGION_COMPRESSOR_CTRL_VALUE_OFFSET   0
 /*协议操作值定义*/
 #define  DATA_NET_WEIGHT_ERR_VALUE                  0xFFFF
 #define  DATA_TEMPERATURE_ERR_VALUE                 0x7F
@@ -94,7 +95,8 @@ static communication_task_contex_t communication_task_contex;
 #define  DATA_RESULT_SET_TEMPERATURE_SUCCESS        0x01
 #define  DATA_RESULT_SET_TEMPERATURE_FAIL           0x00
 #define  DATA_MANUFACTURER_CHANGHONG_ID             0x0101
-
+#define  DATA_RESULT_COMPRESSOR_CTRL_SUCCESS        0x01
+#define  DATA_RESULT_COMPRESSOR_CTRL_FAIL           0x00
 /*CRC16域*/
 #define  ADU_CRC_SIZE                               2
 
@@ -968,6 +970,42 @@ static int process_update(application_update_t *update,uint32_t timeout)
 }
 
 /*
+* @brief 压缩机调试开机
+* @param 无
+* @return -1 失败
+* @return 0 成功
+* @note
+*/
+static int compressor_ctrl_pwr_on()
+{
+    static compressor_task_message_t req_msg;
+    
+    req_msg.request.type = COMPRESSOR_TASK_MSG_TYPE_DEBUG_PWR_ON;
+    /*发送消息*/
+    osMessagePut(compressor_task_msg_q_id,(uint32_t)&req_msg,0);
+
+    return 0;
+}
+
+/*
+* @brief 压缩机调试关机
+* @param 无
+* @return -1 失败
+* @return 0 成功
+* @note
+*/
+static int compressor_ctrl_pwr_off()
+{
+    static compressor_task_message_t req_msg;
+    
+    req_msg.request.type = COMPRESSOR_TASK_MSG_TYPE_DEBUG_PWR_OFF;
+    /*发送消息*/
+    osMessagePut(compressor_task_msg_q_id,(uint32_t)&req_msg,0);
+    
+    return 0;
+}
+
+/*
 * @brief 串口接收主机ADU
 * @param handle 串口句柄
 * @param adu 数据缓存指针
@@ -1045,6 +1083,7 @@ static int parse_adu(uint8_t *adu,uint8_t size,uint8_t *rsp,application_update_t
     uint16_t manufacturer_id;
     uint32_t software_verion;
     uint16_t calibration_weight;
+    uint8_t compressor_ctrl_value;
     uint16_t crc_received,crc_calculated;
 
     uint8_t status;
@@ -1300,8 +1339,31 @@ static int parse_adu(uint8_t *adu,uint8_t size,uint8_t *rsp,application_update_t
             dump_hex_str(update->md5,update->md5_str,16);
             update->update = COMMUNICATION_TASK_APPLICATION_UPDATE;
             log_debug("update file size:%d md5:%s\r\n",update->size,update->md5_str);
-
             break;
+
+        case CODE_COMPRESSOR_CTRL:/*调试控制压缩机信息*/
+            if (size != ADU_DATA_REGION_COMPRESSOR_CTRL_SIZE) {
+                log_error("ctrl compressor data size:%d != %d err.\r\n",size,ADU_DATA_REGION_COMPRESSOR_CTRL_SIZE);
+                return -1;
+            }
+            compressor_ctrl_value = adu[ADU_DATA_REGION_OFFSET + DATA_REGION_COMPRESSOR_CTRL_VALUE_OFFSET];
+            if (compressor_ctrl_value == 1) {
+                log_debug("debug pwr on compressor...\r\n");
+                rc = compressor_ctrl_pwr_on();
+            } else if(compressor_ctrl_value == 0) {
+                rc = compressor_ctrl_pwr_off();
+                log_debug("debug pwr off compressor...\r\n");
+            } else {
+                log_error("compressor ctrl value:%d invalid.\r\n",compressor_ctrl_value)
+                return -1;
+            }
+            if (rc == 0) {
+                rsp[rsp_offset ++] = DATA_RESULT_COMPRESSOR_CTRL_SUCCESS;
+            } else {
+                rsp[rsp_offset ++] = DATA_RESULT_COMPRESSOR_CTRL_FAIL;
+            }
+            break;
+
         default:
             log_error("unknow code:%d err.\r\n",code);
     }
