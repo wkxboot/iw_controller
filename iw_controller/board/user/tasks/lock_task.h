@@ -17,7 +17,7 @@ void lock_task(void const * argument);
 /*状态稳定时间*/
 #define  LOCK_TASK_STATUS_HOLD_ON_TIME              100
 /*手动开门保持时间*/
-//#define  LOCK_TASK_MANUAL_UNLOCK_TIME             5000
+#define  LOCK_TASK_MANUAL_UNLOCK_TIME               5000
 
 /*锁任务状态和结果定义*/
 #define  LOCK_TASK_STATUS_DOOR_OPEN                  1
